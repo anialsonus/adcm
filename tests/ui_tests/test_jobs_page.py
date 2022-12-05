@@ -330,7 +330,7 @@ class TestTaskHeaderPopup:
         """Link to /task from popup with filter"""
 
         cluster_page = ClusterListPage(app_fs.driver, app_fs.adcm.url).open()
-        cluster_page.header.click_job_block_in_header()
+        cluster_page.header.click_job_block()
         open_filter = getattr(cluster_page.header, job_link)
         open_filter()
         job_page = JobListPage(app_fs.driver, app_fs.adcm.url)
@@ -344,7 +344,7 @@ class TestTaskHeaderPopup:
         with allure.step('Run action in cluster'):
             action = cluster.action(display_name=SUCCESS_ACTION_DISPLAY_NAME)
             run_cluster_action_and_assert_result(cluster, action.name, status='success')
-        page.header.click_job_block_in_header()
+        page.header.click_job_block()
         page.header.click_acknowledge_btn_in_job_popup()
         page.header.check_no_jobs_presented()
         assert page.header.get_success_job_amount_from_header() == "0", "Success job amount should be 0"
@@ -420,7 +420,7 @@ class TestTaskHeaderPopup:
                 run_cluster_action_and_assert_result(
                     cluster, cluster.action(display_name=action_name).name, status=expected_status
                 )
-        cluster_page.header.click_job_block_in_header()
+        cluster_page.header.click_job_block()
         assert (
             cluster_page.header.get_success_job_amount_from_header() == job_info['success_jobs']
         ), f"Success job amount should be {job_info['success_jobs']}"
@@ -446,7 +446,7 @@ class TestTaskHeaderPopup:
             for action_name, status in actions.items():
                 action = cluster.action(display_name=action_name)
                 run_cluster_action_and_assert_result(cluster, action.name, status=status)
-        page.header.click_job_block_in_header()
+        page.header.click_job_block()
         for action_name, _ in actions.items():
             page.header.click_on_task_row_by_name(task_name=action_name)
             job_page = JobPageStdout(app_fs.driver, app_fs.adcm.url, job_id=1)
@@ -464,7 +464,7 @@ class TestTaskHeaderPopup:
                     cluster.action(display_name=SUCCESS_ACTION_DISPLAY_NAME).name,
                     status='success',
                 )
-        cluster_page.header.click_job_block_in_header()
+        cluster_page.header.click_job_block()
         with allure.step("Check that in popup 5 tasks"):
             assert len(cluster_page.header.get_job_rows_from_popup()) == 5, "Popup should contain 5 tasks"
         cluster_page.header.click_all_link_in_job_popup()
@@ -481,7 +481,7 @@ class TestTaskHeaderPopup:
         with allure.step('Run action in cluster'):
             row = cluster_page.table.get_all_rows()[0]
             cluster_page.run_action_in_cluster_row(row, LONG_ACTION_DISPLAY_NAME)
-        cluster_page.header.click_job_block_in_header()
+        cluster_page.header.click_job_block()
         cluster_page.header.click_acknowledge_btn_in_job_popup()
 
         cluster_page.header.wait_success_job_amount_from_header(1)

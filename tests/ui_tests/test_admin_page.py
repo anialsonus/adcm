@@ -21,9 +21,8 @@ from typing import Tuple
 import allure
 import pytest
 from adcm_client.objects import ADCMClient, Bundle, Cluster, Host, Provider, Service
-from adcm_pytest_plugin import utils
 from adcm_pytest_plugin.steps.actions import wait_for_task_and_assert_result
-from adcm_pytest_plugin.utils import random_string
+from adcm_pytest_plugin.utils import get_data_dir, random_string
 from tests.ui_tests.app.app import ADCMTest
 from tests.ui_tests.app.page.admin.page import (
     AdminGroupInfo,
@@ -65,27 +64,21 @@ HOST_NAME = "test-host"
 
 @pytest.fixture()
 def users_page(app_fs: ADCMTest) -> AdminUsersPage:
-    """Get Admin Users Page"""
     return AdminUsersPage(app_fs.driver, app_fs.adcm.url).open()
 
 
 @pytest.fixture()
 def settings_page(app_fs: ADCMTest) -> AdminSettingsPage:
-    """Get Admin Settings Page"""
     return AdminSettingsPage(app_fs.driver, app_fs.adcm.url).open()
 
 
 @allure.step("Upload cluster bundle")
 def cluster_bundle(sdk_client_fs: ADCMClient, data_dir_name: str) -> Bundle:
-    """Upload cluster bundle"""
-
-    return sdk_client_fs.upload_from_fs(os.path.join(utils.get_data_dir(__file__), data_dir_name))
+    return sdk_client_fs.upload_from_fs(get_data_dir(__file__, data_dir_name))
 
 
 @pytest.fixture()
 def create_cluster_with_service(sdk_client_fs: ADCMClient) -> Tuple[Cluster, Service]:
-    """Create cluster and add service"""
-
     bundle = cluster_bundle(sdk_client_fs, BUNDLE)
     cluster = bundle.cluster_create(name=CLUSTER_NAME)
     return cluster, cluster.service_add(name=SERVICE_NAME)
@@ -98,7 +91,7 @@ def create_cluster_with_component(
     """Create cluster with component"""
 
     cluster, service = create_cluster_with_service
-    provider_bundle = sdk_client_fs.upload_from_fs(os.path.join(utils.get_data_dir(__file__), "provider"))
+    provider_bundle = sdk_client_fs.upload_from_fs(get_data_dir(__file__, "provider"))
     provider = provider_bundle.provider_create("test provider")
     host = provider.host_create("test-host")
     cluster.host_add(host)
@@ -901,7 +894,7 @@ class TestAdminPolicyPage:
     def test_policy_permission_to_view_access_provider(self, sdk_client_fs, app_fs, another_user):
         """Test for the permissions to provider."""
 
-        provider_bundle = sdk_client_fs.upload_from_fs(os.path.join(utils.get_data_dir(__file__), "provider"))
+        provider_bundle = sdk_client_fs.upload_from_fs(get_data_dir(__file__, "provider"))
         provider = provider_bundle.provider_create("test_provider")
         with allure.step("Create test role"):
             test_role = sdk_client_fs.role_create(
@@ -917,9 +910,7 @@ class TestAdminPolicyPage:
                 objects=[provider],
             )
         with allure.step("Create second provider"):
-            provider_bundle = sdk_client_fs.upload_from_fs(
-                os.path.join(utils.get_data_dir(__file__), "second_provider")
-            )
+            provider_bundle = sdk_client_fs.upload_from_fs(os.path.join(get_data_dir(__file__, "second_provider")))
             second_provider = provider_bundle.provider_create("second_test_provider")
         login_page = LoginPage(app_fs.driver, app_fs.adcm.url).open()
         login_page.login_user(**another_user)
@@ -934,7 +925,7 @@ class TestAdminPolicyPage:
     def test_policy_permission_to_view_access_host(self, sdk_client_fs, app_fs, another_user):
         """Test for the permissions to host."""
 
-        provider_bundle = sdk_client_fs.upload_from_fs(os.path.join(utils.get_data_dir(__file__), "provider"))
+        provider_bundle = sdk_client_fs.upload_from_fs(get_data_dir(__file__, "provider"))
         provider = provider_bundle.provider_create("test_provider")
         host = provider.host_create("test-host")
         with allure.step("Create test role"):
@@ -1017,7 +1008,7 @@ class TestAdminPolicyPage:
         with allure.step("Run action from first cluster"):
             cluster_list_page.run_action_in_cluster_row(cluster_rows[0], "some_action")
         with allure.step("Check task"):
-            cluster_list_page.header.click_job_block_in_header()
+            cluster_list_page.header.click_job_block()
             assert len(cluster_list_page.header.get_job_rows_from_popup()) == 1, "Job amount should be 1"
             job_list_page = JobListPage(app_fs.driver, app_fs.adcm.url).open()
             job_rows = job_list_page.table.get_all_rows()

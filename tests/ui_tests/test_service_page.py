@@ -402,7 +402,7 @@ class TestServiceConfigPage:
         service_config_page.config.check_field_is_required(params['req_name'])
         config_row = service_config_page.config.get_all_config_rows()[0]
         service_config_page.config.type_in_field_with_few_inputs(row=config_row, values=[params['wrong_value']])
-        service_config_page.config.check_field_is_invalid(params['not_req_name'])
+        service_config_page.config.check_field_is_invalid_error(params['not_req_name'])
         service_config_page.config.check_config_warn_icon_on_left_menu()
         with allure.step("Check save button is disabled"):
             assert service_config_page.config.is_save_btn_disabled(), "Save button should be disabled"

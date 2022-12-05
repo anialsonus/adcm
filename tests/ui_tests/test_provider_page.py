@@ -351,7 +351,7 @@ class TestProviderConfigPage:
         provider_config_page.config.check_field_is_required(params['req_name'])
         config_row = provider_config_page.config.get_all_config_rows()[0]
         provider_config_page.config.type_in_field_with_few_inputs(row=config_row, values=[params['wrong_value']])
-        provider_config_page.config.check_field_is_invalid(params['not_req_name'])
+        provider_config_page.config.check_field_is_invalid_error(params['not_req_name'])
         provider_config_page.config.check_config_warn_icon_on_left_menu()
         provider_config_page.toolbar.check_warn_button(
             tab_name="test_provider",
