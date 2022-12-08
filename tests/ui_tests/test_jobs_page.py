@@ -347,9 +347,9 @@ class TestTaskHeaderPopup:
         page.header.click_job_block()
         page.header.click_acknowledge_btn_in_job_popup()
         page.header.check_no_jobs_presented()
-        assert page.header.get_success_job_amount_from_header() == "0", "Success job amount should be 0"
-        assert page.header.get_in_progress_job_amount_from_header() == "0", "In progress job amount should be 0"
-        assert page.header.get_failed_job_amount_from_header() == "0", "Failed job amount should be 0"
+        assert page.header.get_success_job_amount() == 0, "Success job amount should be 0"
+        assert page.header.get_in_progress_job_amount() == 0, "In progress job amount should be 0"
+        assert page.header.get_failed_job_amount() == 0, "Failed job amount should be 0"
         assert 'background: transparent' in page.header.get_jobs_circle_color(), "Bell circle should be without color"
         page.header.check_acknowledge_btn_not_displayed()
 
@@ -361,9 +361,9 @@ class TestTaskHeaderPopup:
             {
                 'status': JobStatus.SUCCESS,
                 'action_name': {SUCCESS_ACTION_DISPLAY_NAME: 'success'},
-                'success_jobs': "1",
-                'in_progress_job_jobs': "0",
-                'failed_jobs': "0",
+                'success_jobs': 1,
+                'in_progress_job_jobs': 0,
+                'failed_jobs': 0,
                 'background': 'conic-gradient(rgb(255, 234, 0) 0deg, rgb(255, 234, 0) 0deg, '
                 'rgb(30, 229, 100) 0deg, rgb(30, 229, 100) 360deg, '
                 'rgb(255, 138, 128) 360deg, rgb(255, 138, 128) 360deg)',
@@ -371,9 +371,9 @@ class TestTaskHeaderPopup:
             {
                 'status': JobStatus.FAILED,
                 'action_name': {FAIL_ACTION_DISPLAY_NAME: 'failed'},
-                'success_jobs': "0",
-                'in_progress_job_jobs': "0",
-                'failed_jobs': "1",
+                'success_jobs': 0,
+                'in_progress_job_jobs': 0,
+                'failed_jobs': 1,
                 'background': 'conic-gradient(rgb(255, 234, 0) 0deg, rgb(255, 234, 0) 0deg, '
                 'rgb(30, 229, 100) 0deg, rgb(30, 229, 100) 0deg, '
                 'rgb(255, 138, 128) 0deg, rgb(255, 138, 128) 360deg)',
@@ -381,9 +381,9 @@ class TestTaskHeaderPopup:
             {
                 'status': JobStatus.RUNNING,
                 'action_name': {LONG_ACTION_DISPLAY_NAME: ''},
-                'success_jobs': "0",
-                'in_progress_job_jobs': "1",
-                'failed_jobs': "0",
+                'success_jobs': 0,
+                'in_progress_job_jobs': 1,
+                'failed_jobs': 0,
                 'background': 'conic-gradient(rgb(255, 234, 0) 0deg, rgb(255, 234, 0) 360deg, '
                 'rgb(30, 229, 100) 360deg, rgb(30, 229, 100) 360deg, '
                 'rgb(255, 138, 128) 360deg, rgb(255, 138, 128) 360deg)',
@@ -396,9 +396,9 @@ class TestTaskHeaderPopup:
                     SUCCESS_ACTION_DISPLAY_NAME: 'success',
                     LONG_ACTION_DISPLAY_NAME: '',
                 },
-                'success_jobs': "1",
-                'in_progress_job_jobs': "1",
-                'failed_jobs': "1",
+                'success_jobs': 1,
+                'in_progress_job_jobs': 1,
+                'failed_jobs': 1,
                 'background': 'conic-gradient(rgb(255, 234, 0) 0deg, rgb(255, 234, 0) 120deg, '
                 'rgb(30, 229, 100) 120deg, rgb(30, 229, 100) 240deg, '
                 'rgb(255, 138, 128) 240deg, rgb(255, 138, 128) 360deg)',
@@ -422,13 +422,13 @@ class TestTaskHeaderPopup:
                 )
         cluster_page.header.click_job_block()
         assert (
-            cluster_page.header.get_success_job_amount_from_header() == job_info['success_jobs']
+            cluster_page.header.get_success_job_amount() == job_info['success_jobs']
         ), f"Success job amount should be {job_info['success_jobs']}"
         assert (
-            cluster_page.header.get_in_progress_job_amount_from_header() == job_info['in_progress_job_jobs']
+            cluster_page.header.get_in_progress_job_amount() == job_info['in_progress_job_jobs']
         ), f"In progress job amount should be {job_info['in_progress_job_jobs']}"
         assert (
-            cluster_page.header.get_failed_job_amount_from_header() == job_info['failed_jobs']
+            cluster_page.header.get_failed_job_amount() == job_info['failed_jobs']
         ), f"Failed job amount should be {job_info['failed_jobs']}"
 
         def _wait_for_background():
@@ -484,9 +484,9 @@ class TestTaskHeaderPopup:
         cluster_page.header.click_job_block()
         cluster_page.header.click_acknowledge_btn_in_job_popup()
 
-        cluster_page.header.wait_success_job_amount_from_header(1)
-        assert cluster_page.header.get_in_progress_job_amount_from_header() == "0", "In progress job amount should be 0"
-        assert cluster_page.header.get_failed_job_amount_from_header() == "0", "Failed job amount should be 0"
+        cluster_page.header.wait_success_job_amount(1)
+        assert cluster_page.header.get_in_progress_job_amount() == 0, "In progress job amount should be 0"
+        assert cluster_page.header.get_failed_job_amount() == 0, "Failed job amount should be 0"
 
     @pytest.mark.skip(reason="Test is only for https://arenadata.atlassian.net/browse/ADCM-2660")
     @pytest.mark.usefixtures("cluster_bundle")

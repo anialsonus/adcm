@@ -142,7 +142,7 @@ class TestServiceMainPage:
         service_main_page.toolbar.run_action(CLUSTER_NAME, "test_action")
         with allure.step("Check success job"):
             assert (
-                service_main_page.header.get_in_progress_job_amount_from_header() == "1"
+                service_main_page.header.get_in_progress_job_amount() == 1
             ), "There should be 1 in progress job in header"
 
 
@@ -179,7 +179,7 @@ class TestServiceComponentPage:
             ), f"Cluster state should be {params['expected_state']}"
         with allure.step("Check success service job"):
             assert (
-                service_component_page.header.get_success_job_amount_from_header() == "1"
+                service_component_page.header.get_success_job_amount() == 1
             ), "There should be 1 success service job in header"
 
 

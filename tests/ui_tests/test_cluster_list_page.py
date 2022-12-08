@@ -283,9 +283,7 @@ class TestClusterListPage:
                 get_info_kwargs={'row': row},
             )
         with allure.step("Check success cluster job"):
-            assert (
-                cluster_page.header.get_success_job_amount_from_header() == "1"
-            ), "There should be 1 success cluster job in header"
+            assert cluster_page.header.get_success_job_amount() == 1, "There should be 1 success cluster job in header"
 
     @pytest.mark.smoke()
     @pytest.mark.include_firefox()
@@ -409,7 +407,7 @@ class TestClusterListPage:
             disclaimer_text=disclaimer_text,
         )
         cluster_page = ClusterListPage(app_fs.driver, app_fs.adcm.url).open()
-        cluster_page.header.wait_success_job_amount_from_header(1)
+        cluster_page.header.wait_success_job_amount(1)
         check_cluster_upgraded(app_fs, CLUSTER_NAME, params["state"])
 
 
@@ -466,7 +464,7 @@ class TestClusterMainPage:
         cluster_main_page.toolbar.run_action(CLUSTER_NAME, params["action_name"])
         with allure.step("Check success job"):
             assert (
-                cluster_main_page.header.get_in_progress_job_amount_from_header() == "1"
+                cluster_main_page.header.get_in_progress_job_amount() == 1
             ), "There should be 1 in progress job in header"
 
 
@@ -537,7 +535,7 @@ class TestClusterServicePage:
             ), f"Cluster state should be {params['expected_state']}"
         with allure.step("Check success service job"):
             assert (
-                cluster_service_page.header.get_success_job_amount_from_header() == "1"
+                cluster_service_page.header.get_success_job_amount() == 1
             ), "There should be 1 success service job in header"
 
     def test_check_service_list_page_import_run(self, app_fs, create_import_cluster_with_service):
@@ -692,7 +690,7 @@ class TestClusterHostPage:
             ), f"Cluster state should be {params['expected_state']}"
         with allure.step("Check success host job"):
             assert (
-                cluster_host_page.header.get_success_job_amount_from_header() == "1"
+                cluster_host_page.header.get_success_job_amount() == 1
             ), "There should be 1 success host job in header"
 
     def test_check_delete_host_from_cluster_host_page(self, app_fs, create_community_cluster_with_host):

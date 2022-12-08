@@ -153,7 +153,7 @@ class TestProviderListPage:
             ), f"provider state should be {params['expected_state']}"
         with allure.step("Check success provider job"):
             assert (
-                provider_page.header.get_success_job_amount_from_header() == "1"
+                provider_page.header.get_success_job_amount() == 1
             ), "There should be 1 success provider job in header"
 
     @pytest.mark.smoke()

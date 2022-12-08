@@ -93,7 +93,8 @@ class BasePageObject(Interactor):
                     "Page URL didn't change. " f'Actual URL: {self.driver.current_url}. Expected URL: {url}.'
                 )
 
-        wait_until_step_succeeds(_open_page, period=0.5, timeout=timeout or self.default_page_timeout)
+        with allure.step(f"Open {self.__class__.__name__}"):
+            wait_until_step_succeeds(_open_page, period=0.5, timeout=timeout or self.default_page_timeout)
 
         if close_popup and self.is_element_displayed(
             CommonPopupLocators.block_by_text("Connection established."), timeout=5
@@ -325,6 +326,9 @@ class Header(Interactor):  # pylint: disable=too-many-public-methods
         """Click doc link in help popup"""
         self.find_and_click(AuthorizedHeaderLocators.HelpPopup.doc_link)
 
+    def hover_logo(self):
+        self.hover_element(AuthorizedHeaderLocators.arenadata_logo)
+
     @allure.step("Assert account elements are displayed")
     def check_account_popup(self):
         """Assert account elements are displayed"""
@@ -354,40 +358,40 @@ class Header(Interactor):  # pylint: disable=too-many-public-methods
         """Click Logout in account popup"""
         self.find_and_click(AuthorizedHeaderLocators.AccountPopup.logout_button)
 
-    def get_success_job_amount_from_header(self):
+    def get_success_job_amount(self) -> int:
         """Get success job amount from header"""
         self.hover_element(AuthorizedHeaderLocators.job_block)
         self.wait_element_visible(AuthorizedHeaderLocators.job_popup)
-        return self.find_element(AuthorizedHeaderLocators.JobPopup.success_jobs).text.split("\n")[1]
+        return int(self.find_element(AuthorizedHeaderLocators.JobPopup.success_jobs).text.split("\n")[1])
 
-    def get_in_progress_job_amount_from_header(self):
+    def get_in_progress_job_amount(self) -> int:
         """Get progress job amount from header"""
         self.hover_element(AuthorizedHeaderLocators.job_block)
         self.wait_element_visible(AuthorizedHeaderLocators.job_popup)
-        return self.find_element(AuthorizedHeaderLocators.JobPopup.in_progress_jobs).text.split("\n")[1]
+        return int(self.find_element(AuthorizedHeaderLocators.JobPopup.in_progress_jobs).text.split("\n")[1])
 
-    def get_failed_job_amount_from_header(self):
+    def get_failed_job_amount(self) -> int:
         """Get failed job amount from header"""
         self.hover_element(AuthorizedHeaderLocators.job_block)
         self.wait_element_visible(AuthorizedHeaderLocators.job_popup)
-        return self.find_element(AuthorizedHeaderLocators.JobPopup.failed_jobs).text.split("\n")[1]
+        return int(self.find_element(AuthorizedHeaderLocators.JobPopup.failed_jobs).text.split("\n")[1])
 
-    def wait_success_job_amount_from_header(self, expected_job_amount: int):
+    def wait_success_job_amount(self, expected_job_amount: int):
         """Wait for success job amount to be as expected"""
 
         def _wait_job():
             assert (
-                int(self.get_success_job_amount_from_header()) == expected_job_amount
+                self.get_success_job_amount() == expected_job_amount
             ), f"Should be {expected_job_amount} tasks in popup header"
 
         wait_until_step_succeeds(_wait_job, period=1, timeout=90)
 
-    def wait_in_progress_job_amount_from_header(self, expected_job_amount: int):
+    def wait_in_progress_job_amount(self, expected_job_amount: int):
         """Wait for in progress job amount to be as expected"""
 
         def _wait_job():
             assert (
-                int(self.get_in_progress_job_amount_from_header()) == expected_job_amount
+                self.get_in_progress_job_amount() == expected_job_amount
             ), f"Should be {expected_job_amount} tasks in popup header"
 
         wait_until_step_succeeds(_wait_job, period=1, timeout=70)
