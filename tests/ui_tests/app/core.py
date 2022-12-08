@@ -55,6 +55,12 @@ class Interactor:
             message=f"Can't find {locator.name} on page " f"{self._driver.current_url} for {timeout} seconds",
         )
 
+    def find_elements_or_empty(self, locator: Locator, timeout: int = 2) -> list[WebElement]:
+        try:
+            return self.find_elements(locator, timeout=timeout)
+        except TimeoutException:
+            return []
+
     def is_element_displayed(self, element: Locator | WebElement, timeout: int | None = None) -> bool:
         return self._is_displayed(
             lambda: element

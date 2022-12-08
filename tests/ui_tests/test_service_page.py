@@ -137,13 +137,9 @@ class TestServiceMainPage:
         cluster_page.check_cluster_toolbar(CLUSTER_NAME)
 
     def test_run_action_on_service_page_by_toolbar(self, app_fs, create_cluster_with_service):
-        """Test run action from the /cluster/{}/service/{}/main page toolbar"""
-
-        params = {"action_name": "test_action"}
-
         cluster, service = create_cluster_with_service
         service_main_page = ServiceMainPage(app_fs.driver, app_fs.adcm.url, cluster.id, service.id).open()
-        service_main_page.toolbar.run_action(CLUSTER_NAME, params["action_name"])
+        service_main_page.toolbar.run_action(CLUSTER_NAME, "test_action")
         with allure.step("Check success job"):
             assert (
                 service_main_page.header.get_in_progress_job_amount_from_header() == "1"

@@ -76,7 +76,7 @@ class BasePageObject(Interactor):
         self.path = path_template.format(**kwargs)
         self.default_page_timeout = default_page_timeout
         self.default_loc_timeout = default_loc_timeout
-        self.header = Header(self.driver, self.base_url)
+        self.header = Header(self.driver, self.default_loc_timeout)
         self.footer = Footer(self.driver, self.default_loc_timeout)
         allure.dynamic.label("page_url", path_template)
 
