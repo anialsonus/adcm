@@ -14,7 +14,6 @@ import functools
 import hashlib
 import shutil
 import tarfile
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime as dt
 from pathlib import Path
@@ -121,9 +120,6 @@ class BundleDefinition:
         # analog of second_pass() on `stage` tables TODO: перенести сюда
         self._validate_funcs = (self._validate_actions, self._validate_components, self._validate_config)
 
-        # {<object type>: <definition>}
-        self._definitions = defaultdict(list)
-
         # analogues of `stage` tables
         self.prototypes = []
         self.actions = []
@@ -133,23 +129,17 @@ class BundleDefinition:
         self.prototype_imports = []
 
     def add_definition(self, definition: Definition) -> None:
-        """add raw object's definition to self, without modifications (action names, etc.)"""
+        """split objects' definitions into prototypes"""
         if isinstance(definition.conf, dict):
             cm.stack.check_object_definition(
                 definition.fname, definition.conf, definition.conf["type"], definition.obj_list
             )
             self._add_prototype(definition.conf, definition)
-            # self._definitions[definition.conf["type"]].append(definition)
 
         elif isinstance(definition.conf, list):
             for obj_def in definition.conf:
                 cm.stack.check_object_definition(definition.fname, obj_def, obj_def["type"], definition.obj_list)
                 self._add_prototype(obj_def, definition)
-                # self._definitions[obj_def["type"]].append(Definition(
-                #     path=definition.path,
-                #     fname=definition.fname,
-                #     conf=obj_def
-                # ))
 
         else:
             raise NotImplementedError
