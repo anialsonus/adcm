@@ -289,3 +289,10 @@ ADCM_SERVICE_ACTION_NAMES_SET = {
     ADCM_DELETE_SERVICE_ACTION_NAME,
 }
 ADCM_MM_ACTION_FORBIDDEN_PROPS_SET = {"config", "hc_acl", "ui_options"}
+
+FILE_READ_CHUNK_SIZE = 16384
+
+BUNDLE_CONFIG_FILES_TYPES = [
+    ("config.yaml", "yaml"),
+    ("config.yml", "yaml"),
+]

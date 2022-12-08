@@ -14,7 +14,11 @@ import functools
 import hashlib
 import shutil
 import tarfile
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime as dt
 from pathlib import Path
+from typing import List
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
@@ -23,6 +27,7 @@ from version_utils import rpm
 import cm.stack
 import cm.status_api
 from cm.adcm_config import init_object_config, proto_ref, switch_config
+from cm.errors import AdcmEx
 from cm.errors import raise_adcm_ex as err
 from cm.logger import logger
 from cm.models import (
@@ -49,7 +54,247 @@ from cm.models import (
 from rbac.models import Role
 from rbac.upgrade.role import prepare_action_roles
 
-STAGE = (
+# pylint: disable=too-many-instance-attributes, too-many-lines
+
+
+@dataclass
+class Definition:
+    path: str
+    fname: str
+    conf: dict
+    adcm_: bool = False
+    obj_list: dict = field(default_factory=dict)
+
+
+@dataclass
+class BundleData:
+    name: str
+    version: str
+    hash: str
+    version_order: int = 0
+    edition: str = "community"
+    description: str = ""
+    date: str = str(dt.utcnow())
+    category: int | None = None
+
+
+@dataclass
+class PrototypeData:
+    type: str
+    name: str
+    version: str
+    parent = None  # TODO: type None | self (typing.Self)
+    bundle: BundleData | None = None
+    path: str = ""
+    license: str = "absent"
+    license_path: str | None = None
+    license_hash: str | None = None
+    display_name: str = ""
+    version_order: int = 0
+    required: bool = False
+    shared: bool = False
+    constraint: str = '[0, "+"]'
+    requires: str = "[]"
+    bound_to: str = "{}"
+    adcm_min_version: str | None = None
+    monitoring: str = "active"
+    description: str = ""
+    config_group_customization: bool = False
+    venv: str = "default"
+    allow_maintenance_mode: bool = False
+    edition: str = "community"
+
+    @property
+    def ref(self):
+        return f"{self.type} \"{self.name}\" {self.version}"
+
+
+class BundleDefinition:
+    """
+    Class for saving whole bundle definition in python's structures
+    to perform validations and save bundle to db if validations was successful
+    """
+
+    def __init__(self, bundle_hash: str):
+        self._bundle_hash = bundle_hash
+
+        # analog of second_pass() on `stage` tables TODO: перенести сюда
+        self._validate_funcs = (self._validate_actions, self._validate_components, self._validate_config)
+
+        # {<object type>: <definition>}
+        self._definitions = defaultdict(list)
+
+        # analogues of `stage` tables
+        self.prototypes = []
+        self.actions = []
+        self.prototype_configs = []
+        self.upgrades = []
+        self.prototype_exports = []
+        self.prototype_imports = []
+
+    def add_definition(self, definition: Definition) -> None:
+        """add raw object's definition to self, without modifications (action names, etc.)"""
+        if isinstance(definition.conf, dict):
+            cm.stack.check_object_definition(
+                definition.fname, definition.conf, definition.conf["type"], definition.obj_list
+            )
+            self._add_prototype(definition.conf, definition)
+            # self._definitions[definition.conf["type"]].append(definition)
+
+        elif isinstance(definition.conf, list):
+            for obj_def in definition.conf:
+                cm.stack.check_object_definition(definition.fname, obj_def, obj_def["type"], definition.obj_list)
+                self._add_prototype(obj_def, definition)
+                # self._definitions[obj_def["type"]].append(Definition(
+                #     path=definition.path,
+                #     fname=definition.fname,
+                #     conf=obj_def
+                # ))
+
+        else:
+            raise NotImplementedError
+
+    def save(self) -> None:
+        # TODO: link all to Bundle
+        self._validate()
+        self._save_to_db()
+
+    def _validate(self):
+        if not any(
+            (
+                self.prototypes,
+                self.actions,
+                self.prototype_configs,
+                self.upgrades,
+                self.prototype_exports,
+                self.prototype_imports,
+            )
+        ):
+            raise RuntimeError("Add some definitions via `add_definition()` first")
+
+        for validate_func in self._validate_funcs:
+            validate_func()
+
+    def _save_to_db(self):
+        pass
+
+    def _validate_actions(self):
+        pass
+
+    def _validate_components(self):
+        pass
+
+    def _validate_config(self):
+        pass
+
+    def _add_prototype(self, conf: dict, definition: Definition) -> None:
+        # proto_index = len(self.prototypes)
+        prototype = PrototypeData(name=conf["name"], type=conf["type"], path=definition.path, version=conf["version"])
+
+        if conf.get("required"):
+            prototype.required = conf["required"]
+        if conf.get("shared"):
+            prototype.shared = conf["shared"]
+        if conf.get("monitoring"):
+            prototype.monitoring = conf["monitoring"]
+        if conf.get("description"):
+            prototype.description = conf["description"]
+        if conf.get("adcm_min_version"):
+            prototype.adcm_min_version = conf["adcm_min_version"]
+        if conf.get("venv"):
+            prototype.venv = conf["venv"]
+        if conf.get("edition"):
+            prototype.edition = conf["edition"]
+        if conf.get("allow_maintenance_mode"):
+            prototype.allow_maintenance_mode = conf["allow_maintenance_mode"]
+
+        prototype.display_name = self._get_display_name(conf, prototype)
+        prototype.config_group_customization = self._get_config_group_customization(conf, prototype)
+        if license_hash := self._get_license_hash(conf, prototype, definition) != "absent" and prototype.type not in [
+            "cluster",
+            "service",
+            "provider",
+        ]:
+            raise AdcmEx(
+                "INVALID_OBJECT_DEFINITION",
+                f"Invalid license definition in {prototype.ref}. License can be placed in cluster, service or provider",
+            )
+        if conf.get("license") and license_hash != "absent":
+            prototype.license_path = conf["license"]
+            prototype.license_hash = license_hash
+
+        self.prototypes.append(prototype)
+
+        # TODO: save_actions
+        # TODO: save_upgrade
+        # TODO: save_components
+        # TODO: save_prototype_config
+        # TODO: save_export
+        # TODO: save_import
+
+    @staticmethod
+    def _get_display_name(conf: dict, prototype: PrototypeData) -> str:
+        if "display_name" in conf:
+            return conf["display_name"]
+
+        return prototype.name
+
+    def _get_license_hash(self, conf: dict, prototype: PrototypeData, definition: Definition) -> str:
+        if "license" not in conf:
+            return "absent"
+
+        else:
+            if conf["license"][0:2] == "./":
+                path = Path(settings.BUNDLE_DIR, self._bundle_hash, prototype.path, conf["license"])
+            else:
+                path = Path(settings.BUNDLE_DIR, self._bundle_hash, definition.fname)
+
+            license_file = None
+            try:
+                license_file = open(path, "r", encoding=settings.ENCODING_UTF_8)
+            except FileNotFoundError as e:
+                raise AdcmEx("CONFIG_TYPE_ERROR", f'"license file" "{path}" is not found ({prototype.ref})') from e
+            except PermissionError:
+                raise AdcmEx("CONFIG_TYPE_ERROR", f'"license file" "{path}" can not be open ({prototype.ref})') from e
+
+            if license_file is not None:
+                body = license_file.read()
+                license_file.close()
+
+                sha1 = hashlib.sha256()
+                sha1.update(body.encode(settings.ENCODING_UTF_8))
+
+                return sha1.hexdigest()
+
+        return "absent"
+
+    def _get_config_group_customization(self, conf: dict, proto: PrototypeData) -> bool:
+        if "config_group_customization" not in conf:
+            service_proto = None
+
+            if proto.type == "service":
+                service_proto = [i for i in self.prototypes + [proto] if i.type == "cluster"]
+                if len(service_proto) < 1:
+                    logger.debug("Can't find cluster for service %s", proto)
+                elif len(service_proto) > 1:
+                    logger.debug("Found more than one cluster for service %s", proto)
+                else:
+                    service_proto = service_proto[0]
+
+            elif proto.type == "component":
+                service_proto = proto.parent
+
+            if service_proto:
+                return service_proto.config_group_customization
+
+        return False
+
+    # cm.stack.save_actions  TODO: апгрейды, versions, etc
+    def _fix_actions(self, upgrade: dict | None = None):
+        pass
+
+
+STAGE = (  # TODO: remove
     StagePrototype,
     StageAction,
     StagePrototypeConfig,
@@ -59,19 +304,35 @@ STAGE = (
 )
 
 
-def load_bundle(bundle_file):
+def load_bundle(bundle_file) -> Bundle:
     logger.info('loading bundle file "%s" ...', bundle_file)
-    (bundle_hash, path) = process_file(bundle_file)
+
+    check_stage()  # TODO: remove
+
+    bundle_path = str(settings.DOWNLOAD_DIR / bundle_file)
+    bundle_hash = get_hash_safe(path=bundle_path)
+    path = untar_safe(bundle_hash=bundle_hash, path=bundle_path)
 
     try:
-        check_stage()
-        process_bundle(path, bundle_hash)
-        bundle_proto = get_stage_bundle(bundle_file)
-        second_pass()
-    except:
-        clear_stage()
+        bundle_def = BundleDefinition(bundle_hash=bundle_hash)
+
+        definitions = get_bundle_definitions(path=path, bundle_hash=bundle_hash)  # ???
+        if not definitions:
+            raise AdcmEx("BUNDLE_ERROR", f"Can't find any definitions in bundle {bundle_file}")
+
+        for definition in definitions:
+            bundle_def.add_definition(definition)
+            # cm.stack.save_definition_to_stage(bundle_hash=bundle_hash, **definition.__dict__)
+
+        bundle_def.save()
+
+        process_bundle(path, bundle_hash)  # TODO: remove
+        bundle_proto = get_stage_bundle(bundle_file)  # TODO: remove
+        second_pass()  # TODO: move checks to BundleDefinition._validate, remove
+    except Exception as e:
+        clear_stage()  # TODO: remove
         shutil.rmtree(path)
-        raise
+        raise e
 
     try:
         bundle = copy_stage(bundle_hash, bundle_proto)
@@ -124,14 +385,7 @@ def order_versions():
     order_model_versions(Bundle)
 
 
-def process_file(bundle_file):
-    path = str(settings.DOWNLOAD_DIR / bundle_file)
-    bundle_hash = get_hash_safe(path)
-    dir_path = untar_safe(bundle_hash, path)
-    return (bundle_hash, dir_path)
-
-
-def untar_safe(bundle_hash, path):
+def untar_safe(bundle_hash, path) -> str:
     try:
         dir_path = untar(bundle_hash, path)
     except tarfile.ReadError:
@@ -139,19 +393,22 @@ def untar_safe(bundle_hash, path):
     return dir_path
 
 
-def untar(bundle_hash, bundle):
+def untar(bundle_hash: str, bundle: str) -> str:
     path = settings.BUNDLE_DIR / bundle_hash
     if path.is_dir():
         try:
             existed = Bundle.objects.get(hash=bundle_hash)
-            msg = "Bundle already exists. Name: {}, version: {}, edition: {}"
-            err("BUNDLE_ERROR", msg.format(existed.name, existed.version, existed.edition))
+            raise AdcmEx(
+                "BUNDLE_ERROR",
+                f"Bundle already exists. Name: {existed.name}, version: {existed.version}, edition: {existed.edition}",
+            )
         except Bundle.DoesNotExist:
             logger.warning(
                 (
-                    f"There is no bundle with hash {bundle_hash} in DB, ",
-                    "but there is a dir on disk with this hash. Dir will be rewrited.",
-                )
+                    "There is no bundle with hash %s in DB, "
+                    "but there is a dir on disk with this hash. Dir will be rewrited."
+                ),
+                bundle_hash,
             )
     tar = tarfile.open(bundle)
     tar.extractall(path=path)
@@ -159,7 +416,7 @@ def untar(bundle_hash, bundle):
     return path
 
 
-def get_hash_safe(path):
+def get_hash_safe(path: str) -> str:
     try:
         bundle_hash = get_hash(path)
     except FileNotFoundError:
@@ -169,10 +426,10 @@ def get_hash_safe(path):
     return bundle_hash
 
 
-def get_hash(bundle_file):
+def get_hash(bundle_file: str) -> str:
     sha1 = hashlib.sha1()
     with open(bundle_file, "rb") as fp:
-        for data in iter(lambda: fp.read(16384), b""):
+        for data in iter(lambda: fp.read(settings.FILE_READ_CHUNK_SIZE), b""):
             sha1.update(data)
     return sha1.hexdigest()
 
@@ -185,7 +442,7 @@ def load_adcm():
         logger.warning("Empty adcm config (%s)", adcm_file)
         return
     try:
-        cm.stack.save_definition("", adcm_file, conf, {}, "adcm", True)
+        cm.stack.save_definition_to_stage("", adcm_file, conf, {}, "adcm", True)
         process_adcm()
     except:
         clear_stage()
@@ -237,21 +494,36 @@ def upgrade_adcm(adcm, bundle):
     return adcm
 
 
+def get_bundle_definitions(path: str, bundle_hash: str) -> List[Definition]:
+    definitions = []
+
+    for conf_path, conf_file, conf_type in cm.stack.get_config_files(path=path, bundle_hash=bundle_hash):
+        definition = cm.stack.read_definition(conf_file, conf_type)
+        if definition:
+            definitions.append(
+                Definition(
+                    path=conf_path,
+                    fname=conf_file,
+                    conf=definition,
+                )
+            )
+
+    return definitions
+
+
 def process_bundle(path, bundle_hash):
     obj_list = {}
+
     for conf_path, conf_file, conf_type in cm.stack.get_config_files(path, bundle_hash):
         conf = cm.stack.read_definition(conf_file, conf_type)
         if conf:
-            cm.stack.save_definition(conf_path, conf_file, conf, obj_list, bundle_hash)
+            cm.stack.save_definition_to_stage(conf_path, conf_file, conf, obj_list, bundle_hash)
 
 
-def check_stage():
-    def count(model):
-        if model.objects.all().count():
-            err("BUNDLE_ERROR", f"Stage is not empty {model}")
-
+def check_stage() -> None:
     for model in STAGE:
-        count(model)
+        if model.objects.all().count():
+            raise AdcmEx("BUNDLE_ERROR", f"Stage is not empty {model}")
 
 
 def copy_obj(orig, clone, fields):

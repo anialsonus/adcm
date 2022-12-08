@@ -49,25 +49,25 @@ from cm.models import (
 NAME_REGEX = r"[0-9a-zA-Z_\.-]+"
 
 
-def save_definition(path, fname, conf, obj_list, bundle_hash, adcm_=False):
+def save_definition_to_stage(path, fname, conf, obj_list, bundle_hash, adcm_=False):
     if isinstance(conf, dict):
-        save_object_definition(path, fname, conf, obj_list, bundle_hash, adcm_)
+        save_object_definition_to_stage(path, fname, conf, obj_list, bundle_hash, adcm_)
     else:
         for obj_def in conf:
-            save_object_definition(path, fname, obj_def, obj_list, bundle_hash, adcm_)
+            save_object_definition_to_stage(path, fname, obj_def, obj_list, bundle_hash, adcm_)
 
 
 def cook_obj_id(conf):
     return f"{conf['type']}.{conf['name']}.{conf['version']}"
 
 
-def save_object_definition(path, fname, conf, obj_list, bundle_hash, adcm_=False):
+def save_object_definition_to_stage(path, fname, conf, obj_list, bundle_hash, adcm_=False):
     def_type = conf["type"]
     if def_type == "adcm" and not adcm_:
         return err("INVALID_OBJECT_DEFINITION", f'Invalid type "{def_type}" in object definition: {fname}')
 
     check_object_definition(fname, conf, def_type, obj_list)
-    obj = save_prototype(path, conf, def_type, bundle_hash)
+    obj = save_stage_prototype(path, conf, def_type, bundle_hash)
     logger.info("Save definition of %s \"%s\" %s to stage", def_type, conf["name"], conf["version"])
     obj_list[cook_obj_id(conf)] = fname
 
@@ -188,7 +188,7 @@ def process_config_group_customization(actual_config: dict, obj: StagePrototype)
             actual_config["config_group_customization"] = sp.config_group_customization
 
 
-def save_prototype(path, conf, def_type, bundle_hash):
+def save_stage_prototype(path, conf, def_type, bundle_hash):
     # validate_name(type_name, '{} type name "{}"'.format(def_type, conf['name']))
     proto = StagePrototype(name=conf["name"], type=def_type, path=path, version=conf["version"])
     dict_to_obj(conf, "required", proto)
