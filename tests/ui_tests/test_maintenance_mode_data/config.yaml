@@ -38,18 +38,6 @@
           params:
             ansible_tags: short, turn-off-component
 
-    long_action:
-      actions:
-        adcm_turn_on_maintenance_mode:
-          <<: *action
-          params:
-            ansible_tags: long, turn-on-component
-
-        adcm_turn_off_maintenance_mode:
-          <<: *action
-          params:
-            ansible_tags: long, turn-off-component
-
 - type: service
   name: mm_action
   version: 1.1

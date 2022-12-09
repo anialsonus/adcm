@@ -282,11 +282,11 @@ class TestAdminSettingsPage:
             ), f"Action {params['test_action']} should be enabled"
         with allure.step("Check Test LDAP connection action"):
             settings_page.toolbar.run_adcm_action(action_name=params["test_action"])
-            settings_page.header.wait_in_progress_job_amount_from_header(expected_job_amount=1)
-            settings_page.header.wait_in_progress_job_amount_from_header(expected_job_amount=0)
+            settings_page.header.wait_in_progress_job_amount(expected_job_amount=1)
+            settings_page.header.wait_in_progress_job_amount(expected_job_amount=0)
         with allure.step("Check Run LDAP sync action"):
             settings_page.toolbar.run_adcm_action(action_name=params["connect_action"])
-            settings_page.header.wait_in_progress_job_amount_from_header(expected_job_amount=1)
+            settings_page.header.wait_in_progress_job_amount(expected_job_amount=1)
 
 
 @pytest.mark.usefixtures("_login_to_adcm_over_api")
@@ -371,7 +371,7 @@ class TestAdminUsersPage:
     def test_ldap_user_change_is_forbidden(self, users_page: AdminUsersPage, ldap_user_in_group):
         """Change ldap user"""
 
-        users_page.header.wait_success_job_amount_from_header(1)
+        users_page.header.wait_success_job_amount(1)
         with allure.step(f'Check user {ldap_user_in_group["name"]} is listed in users list'):
             assert users_page.is_user_presented(
                 ldap_user_in_group["name"]
@@ -625,7 +625,7 @@ class TestAdminGroupsPage:
 
         params = {"group_name": "adcm_users"}
         groups_page = AdminGroupsPage(app_fs.driver, app_fs.adcm.url).open()
-        groups_page.header.wait_success_job_amount_from_header(1)
+        groups_page.header.wait_success_job_amount(1)
         with allure.step(f"Check group {params['group_name']} is listed in groups list"):
             assert (
                 groups_page.get_all_groups()[0].name == params["group_name"]
@@ -640,7 +640,7 @@ class TestAdminGroupsPage:
         params = {"group_name": "Test_group"}
         groups_page = AdminGroupsPage(app_fs.driver, app_fs.adcm.url).open()
         groups_page.create_custom_group(name=params["group_name"], description=None, users=None)
-        groups_page.header.wait_success_job_amount_from_header(1)
+        groups_page.header.wait_success_job_amount(1)
         groups_page.update_group(name=params["group_name"], users=ldap_user_in_group["name"])
         with allure.step(f"Check group {params['group_name']} has user {ldap_user_in_group['name']}"):
             assert (

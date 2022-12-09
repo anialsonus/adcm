@@ -196,7 +196,7 @@ class ClusterServicesPage(CommonClusterPage):
 
         raise AssertionError("No suitable service row found")
 
-    def get_rows(self, predicate: Callable[[ServiceRow], bool] = lambda _: True) -> tuple[ServiceRow]:
+    def get_rows(self, predicate: Callable[[ServiceRow], bool] = lambda _: True) -> tuple[ServiceRow, ...]:
         return tuple(
             filter(
                 predicate,
@@ -302,7 +302,7 @@ class ServiceComponentsPage(BasePageObject):
 
         raise AssertionError("No suitable component row found")
 
-    def get_rows(self, predicate: Callable[[ComponentRow], bool] = lambda _: True) -> tuple[ComponentRow]:
+    def get_rows(self, predicate: Callable[[ComponentRow], bool] = lambda _: True) -> tuple[ComponentRow, ...]:
         return tuple(
             filter(
                 predicate,

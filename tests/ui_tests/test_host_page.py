@@ -361,7 +361,7 @@ class TestHostListPage:
         with allure.step("Run action and check available actions changed"):
             page.run_action(0, INIT_ACTION)
             _ = [job.wait() for job in sdk_client_fs.job_list()]
-            page.header.wait_success_job_amount_from_header(1)
+            page.header.wait_success_job_amount(1)
             page.driver.refresh()
             assert page.get_disabled_action_names(0) == [
                 REINIT_ACTION
@@ -417,7 +417,7 @@ class TestHostMainPage:
         host_main_page.toolbar.run_action(HOST_FQDN, params["action_name"])
         with allure.step("Check success job"):
             assert (
-                host_main_page.header.get_in_progress_job_amount_from_header() == "1"
+                host_main_page.header.get_in_progress_job_amount() == 1
             ), "There should be 1 in progress job in header"
 
 
