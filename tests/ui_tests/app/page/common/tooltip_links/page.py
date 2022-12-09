@@ -14,7 +14,6 @@
 
 import allure
 from selenium.common import TimeoutException
-
 from tests.ui_tests.app.checks import (
     check_element_is_hidden,
     check_elements_are_displayed,
