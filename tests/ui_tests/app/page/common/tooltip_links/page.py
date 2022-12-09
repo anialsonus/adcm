@@ -25,6 +25,9 @@ from tests.ui_tests.app.page.common.tooltip_links.locator import CommonToolbarLo
 class CommonToolbar(BasePageObject):
     """Common Toolbar class"""
 
+    default_find_timeout = 1
+    default_visible_timeout = 5
+
     def __init__(self, driver, base_url):
         super().__init__(driver, base_url)
 
@@ -63,6 +66,18 @@ class CommonToolbar(BasePageObject):
         )
         self.find_and_click(CommonToolbarLocators.adcm_action_btn, is_js=True)
         return is_active
+
+    def get_action_hint(self, action_name: str) -> str:
+        self.wait_element_visible(CommonToolbarLocators.admin_link)
+        self.find_and_click(CommonToolbarLocators.adcm_action_btn)
+        self.hover_element(CommonToolbarLocators.Popup.item(action_name))
+        try:
+            self.wait_element_visible(CommonToolbarLocators.Hint.hint_text, timeout=self.default_visible_timeout)
+            return self.find_element(CommonToolbarLocators.Hint.hint_text, timeout=self.default_find_timeout).text
+        except TimeoutException:
+            return ""
+        finally:
+            self.find_and_click(CommonToolbarLocators.adcm_action_btn, is_js=True)
 
     @allure.step("Run action {action_name} in ADCM tab")
     def run_adcm_action(self, action_name: str):
