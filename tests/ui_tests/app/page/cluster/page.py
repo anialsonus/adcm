@@ -288,7 +288,7 @@ class ServiceComponentsPage(BasePageObject):
         super().__init__(
             driver,
             base_url,
-            path_template="/cluster/{cluster_id}/service/{service_id}/component/",
+            path_template="/cluster/{cluster_id}/service/{service_id}/component",
             cluster_id=cluster_id,
             service_id=service_id,
         )

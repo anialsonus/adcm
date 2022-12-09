@@ -301,11 +301,11 @@ class TestHostListPage:
     def test_delete_bonded_host(self, page: HostListPage, create_bonded_host):
         """Host shouldn't be deleted"""
 
-        check_element_is_visible(self, HostListLocators.HostTable.row)
+        check_element_is_visible(page, HostListLocators.HostTable.row)
         page.open_host_creation_popup()
         page.host_popup.create_host(HOST_FQDN, cluster=CLUSTER_NAME)
         page.delete_host(0)
-        check_element_is_visible(self, HostListLocators.HostTable.row)
+        check_element_is_visible(page, HostListLocators.HostTable.row)
 
     @pytest.mark.smoke()
     @pytest.mark.include_firefox()
