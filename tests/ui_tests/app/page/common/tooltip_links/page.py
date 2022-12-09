@@ -13,6 +13,8 @@
 """Tooltip page PageObjects classes"""
 
 import allure
+from selenium.common import TimeoutException
+
 from tests.ui_tests.app.checks import (
     check_element_is_hidden,
     check_elements_are_displayed,
@@ -27,9 +29,6 @@ class CommonToolbar(BasePageObject):
 
     default_find_timeout = 1
     default_visible_timeout = 5
-
-    def __init__(self, driver, base_url):
-        super().__init__(driver, base_url)
 
     @allure.step("Click on admin link")
     def click_admin_link(self):
