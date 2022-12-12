@@ -12,8 +12,10 @@
 
 import functools
 import hashlib
+import re
 import shutil
 import tarfile
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime as dt
 from pathlib import Path
@@ -50,6 +52,20 @@ from cm.models import (
     SubAction,
     Upgrade,
 )
+from cm.stack import (
+    ANY,
+    AVAILABLE,
+    MASKING,
+    MULTI_STATE,
+    ON_FAIL,
+    ON_SUCCESS,
+    SET,
+    STATE,
+    STATES,
+    UNAVAILABLE,
+    UNSET,
+    _deep_get,
+)
 from rbac.models import Role
 from rbac.upgrade.role import prepare_action_roles
 
@@ -58,11 +74,26 @@ from rbac.upgrade.role import prepare_action_roles
 
 @dataclass
 class Definition:
+    """Definition from .yaml file"""
+
     path: str
     fname: str
     conf: dict
     adcm_: bool = False
     obj_list: dict = field(default_factory=dict)
+
+
+@dataclass
+class DefinitionData:
+    """Definition divided into entities (lists od dataclasses)"""
+
+    prototypes: list = field(default_factory=list)
+    actions: list = field(default_factory=list)
+    sub_actions: list = field(default_factory=list)
+    prototype_configs: list = field(default_factory=list)
+    upgrades: list = field(default_factory=list)
+    prototype_exports: list = field(default_factory=list)
+    prototype_imports: list = field(default_factory=list)
 
 
 @dataclass
@@ -108,6 +139,64 @@ class PrototypeData:
         return f"{self.type} \"{self.name}\" {self.version}"
 
 
+@dataclass
+class ActionData:
+    prototype: PrototypeData
+    name: str
+    type: str
+    script: str | None = None
+    script_type: str | None = None
+    display_name: str = ""
+    description: str = ""
+    ui_options: str = "{}"
+    state_available: str = "[]"
+    state_unavailable: str = "[]"
+    state_on_success: str = ""
+    state_on_fail: str = ""
+    multi_state_available: str = "any"
+    multi_state_unavailable: str = "[]"
+    multi_state_on_success_set: str = "[]"
+    multi_state_on_success_unset: str = "[]"
+    multi_state_on_fail_set: str = "[]"
+    multi_state_on_fail_unset: str = "[]"
+    params: str = "{}"
+    log_files: str = "[]"
+    hostcomponentmap: str = "[]"
+    allow_to_terminate: bool = False
+    partial_execution: bool = False
+    host_action: bool = False
+    allow_in_maintenance_mode: bool = False
+    venv: str = "default"
+
+
+@dataclass
+class SubActionData:
+    action: ActionData
+    name: str
+    script: str
+    script_type: str
+    display_name: str = ""
+    state_on_fail: str = ""
+    multi_state_on_fail_set: str = "[]"
+    multi_state_on_fail_unset: str = "[]"
+    params: str = "{}"
+    allow_to_terminate: bool | None = None
+
+
+@dataclass
+class UpgradeData:
+    min_version: str
+    max_version: str
+    name: str = ""
+    description: str = ""
+    min_strict: bool = False
+    max_strict: bool = False
+    from_edition: str = "[\"community\"]"
+    state_available: str = "[]"
+    state_on_success: str = ""
+    action: ActionData | None = None
+
+
 class BundleDefinition:
     """
     Class for saving whole bundle definition in python's structures
@@ -120,16 +209,18 @@ class BundleDefinition:
         # analog of second_pass() on `stage` tables TODO: перенести сюда
         self._validate_funcs = (self._validate_actions, self._validate_components, self._validate_config)
 
-        # analogues of `stage` tables
-        self.prototypes = []
-        self.actions = []
-        self.prototype_configs = []
-        self.upgrades = []
-        self.prototype_exports = []
-        self.prototype_imports = []
+        # analogue of `stage` tables
+        self._definitions = []
+        # self.prototypes = []
+        # self.actions = []
+        # self.prototype_configs = []
+        # self.upgrades = []
+        # self.prototype_exports = []
+        # self.prototype_imports = []
 
     def add_definition(self, definition: Definition) -> None:
         """split objects' definitions into prototypes"""
+
         if isinstance(definition.conf, dict):
             cm.stack.check_object_definition(
                 definition.fname, definition.conf, definition.conf["type"], definition.obj_list
@@ -150,17 +241,18 @@ class BundleDefinition:
         self._save_to_db()
 
     def _validate(self):
-        if not any(
-            (
-                self.prototypes,
-                self.actions,
-                self.prototype_configs,
-                self.upgrades,
-                self.prototype_exports,
-                self.prototype_imports,
-            )
-        ):
-            raise RuntimeError("Add some definitions via `add_definition()` first")
+        # TODO: rework commented
+        # if not any(
+        #     (
+        #         self.prototypes,
+        #         self.actions,
+        #         self.prototype_configs,
+        #         self.upgrades,
+        #         self.prototype_exports,
+        #         self.prototype_imports,
+        #     )
+        # ):
+        #     raise RuntimeError("Add some definitions via `add_definition()` first")
 
         for validate_func in self._validate_funcs:
             validate_func()
@@ -177,29 +269,35 @@ class BundleDefinition:
     def _validate_config(self):
         pass
 
+    # TODO: validate whole definition. new containers for not validated yet???
     def _add_prototype(self, conf: dict, definition: Definition) -> None:
         # proto_index = len(self.prototypes)
+        definition_data = DefinitionData()
+
         prototype = PrototypeData(name=conf["name"], type=conf["type"], path=definition.path, version=conf["version"])
 
-        if conf.get("required"):
+        if conf.get("required") is not None:
             prototype.required = conf["required"]
-        if conf.get("shared"):
+        if conf.get("shared") is not None:
             prototype.shared = conf["shared"]
-        if conf.get("monitoring"):
+        if conf.get("monitoring") is not None:
             prototype.monitoring = conf["monitoring"]
-        if conf.get("description"):
+        if conf.get("description") is not None:
             prototype.description = conf["description"]
-        if conf.get("adcm_min_version"):
+        if conf.get("adcm_min_version") is not None:
             prototype.adcm_min_version = conf["adcm_min_version"]
-        if conf.get("venv"):
+        if conf.get("venv") is not None:
             prototype.venv = conf["venv"]
-        if conf.get("edition"):
+        if conf.get("edition") is not None:
             prototype.edition = conf["edition"]
-        if conf.get("allow_maintenance_mode"):
+        if conf.get("allow_maintenance_mode") is not None:
             prototype.allow_maintenance_mode = conf["allow_maintenance_mode"]
 
         prototype.display_name = self._get_display_name(conf, prototype)
-        prototype.config_group_customization = self._get_config_group_customization(conf, prototype)
+        prototype.config_group_customization = self._get_config_group_customization(
+            conf=conf, proto=prototype, definition_data=definition_data
+        )
+
         if license_hash := self._get_license_hash(conf, prototype, definition) != "absent" and prototype.type not in [
             "cluster",
             "service",
@@ -213,7 +311,8 @@ class BundleDefinition:
             prototype.license_path = conf["license"]
             prototype.license_hash = license_hash
 
-        self.prototypes.append(prototype)
+        definition_data.prototypes.append(prototype)
+        self._save_actions(definition_data=definition_data, prototype=prototype, config=conf, upgrade=None)  # TODO
 
         # TODO: save_actions
         # TODO: save_upgrade
@@ -221,6 +320,8 @@ class BundleDefinition:
         # TODO: save_prototype_config
         # TODO: save_export
         # TODO: save_import
+
+        self._definitions.append(definition_data)
 
     @staticmethod
     def _get_display_name(conf: dict, prototype: PrototypeData) -> str:
@@ -258,12 +359,17 @@ class BundleDefinition:
 
         return "absent"
 
-    def _get_config_group_customization(self, conf: dict, proto: PrototypeData) -> bool:
+    def _get_config_group_customization(
+        self, conf: dict, proto: PrototypeData, definition_data: DefinitionData
+    ) -> bool:
+        if not conf:
+            return False
+
         if "config_group_customization" not in conf:
             service_proto = None
 
             if proto.type == "service":
-                service_proto = [i for i in self.prototypes + [proto] if i.type == "cluster"]
+                service_proto = [i for i in definition_data.prototypes + [proto] if i.type == "cluster"]
                 if len(service_proto) < 1:
                     logger.debug("Can't find cluster for service %s", proto)
                 elif len(service_proto) > 1:
@@ -279,9 +385,130 @@ class BundleDefinition:
 
         return False
 
-    # cm.stack.save_actions  TODO: апгрейды, versions, etc
-    def _fix_actions(self, upgrade: dict | None = None):
-        pass
+    def _save_actions(
+        self,
+        definition_data: DefinitionData,
+        prototype: PrototypeData,
+        config: dict,
+        upgrade: UpgradeData | None = None,
+    ):
+        config_ = deepcopy(config)
+
+        if config_.get("versions") is not None:
+            config_["type"] = "task"
+            upgrade_name = config_["name"]
+            config_["display_name"] = f"Upgrade: {upgrade_name}"
+
+            if upgrade is not None:
+                action_name = (
+                    f"{prototype.name}_{prototype.version}_{prototype.edition}_upgrade_{upgrade_name}_"
+                    f"{upgrade.min_version}_strict_{upgrade.min_strict}-{upgrade.max_version}_strict_"
+                    f"{upgrade.min_strict}_editions-{'_'.join(upgrade.from_edition)}_state_available-"
+                    f"{'_'.join(upgrade.state_available)}_state_on_success-{upgrade.state_on_success}"
+                )
+            else:
+                action_name = f"{prototype.name}_{prototype.version}_{prototype.edition}_upgrade_{upgrade_name}"
+
+            action_name = re.sub(r"\s+", "_", action_name).strip().lower()
+            action_name = re.sub(r"\(|\)", "", action_name)
+
+            upgrade_action = self._make_action(prototype=prototype, action=config_, action_name=action_name)
+            definition_data.actions.append(upgrade_action)
+
+        if config_.get("actions") is None:
+            return None
+
+        for action_name in sorted(config_["actions"]):
+            action = self._make_action(
+                prototype=prototype, action=config_["actions"][action_name], action_name=action_name
+            )
+            definition_data.actions.append(action)
+
+        return None
+
+    def _make_action(self, prototype: PrototypeData, action: dict, action_name: str) -> ActionData:
+        # pylint: disable=too-many-branches,too-many-statements
+        cm.stack.validate_name(action_name, f"Action name \"{action_name}\" of {prototype.ref}")
+        action_data = ActionData(prototype=prototype, name=action_name, type=action["type"])
+
+        if action_data.type == "job":
+            action.script = action["script"]
+            action.script_type = action["script_type"]
+
+        action_data.display_name = self._get_display_name(conf=action, prototype=prototype)
+
+        if action.get("description") is not None:
+            action_data.description = action["description"]
+        if action.get("allow_to_terminate") is not None:
+            action_data.allow_to_terminate = action["allow_to_terminate"]
+        if action.get("partial_execution") is not None:
+            action_data.partial_execution = action["partial_execution"]
+        if action.get("host_action") is not None:
+            action_data.host_action = action["host_action"]
+        if action.get("ui_options") is not None:
+            action_data.ui_options = action["ui_options"]
+        if action.get("params") is not None:
+            action_data.params = action["params"]
+        if action.get("log_files") is not None:
+            action_data.log_files = action["log_files"]
+        if action.get("venv") is not None:
+            action_data.venv = action["venv"]
+        if action.get("allow_in_maintenance_mode") is not None:
+            action_data.allow_in_maintenance_mode = action["allow_in_maintenance_mode"]
+        if action.get("hc_acl") is not None:
+            action_data.hostcomponentmap = self._get_fixed_action_hc_acl(prototype=prototype, action=action)
+
+        if MASKING in action:
+            if STATES in action:
+                raise AdcmEx(
+                    "INVALID_OBJECT_DEFINITION",
+                    f"Action {action_name} uses both mutual excluding states \"states\" and \"masking\"",
+                )
+            action_data.state_available = _deep_get(action, MASKING, STATE, AVAILABLE, default=ANY)
+            action_data.state_unavailable = _deep_get(action, MASKING, STATE, UNAVAILABLE, default=[])
+            action_data.state_on_success = _deep_get(action, ON_SUCCESS, STATE, default="")
+            action_data.state_on_fail = _deep_get(action, ON_FAIL, STATE, default="")
+
+            action_data.multi_state_available = _deep_get(action, MASKING, MULTI_STATE, AVAILABLE, default=ANY)
+            action_data.multi_state_unavailable = _deep_get(action, MASKING, MULTI_STATE, UNAVAILABLE, default=[])
+            action_data.multi_state_on_success_set = _deep_get(action, ON_SUCCESS, MULTI_STATE, SET, default=[])
+            action_data.multi_state_on_success_unset = _deep_get(action, ON_SUCCESS, MULTI_STATE, UNSET, default=[])
+            action_data.multi_state_on_fail_set = _deep_get(action, ON_FAIL, MULTI_STATE, SET, default=[])
+            action_data.multi_state_on_fail_unset = _deep_get(action, ON_FAIL, MULTI_STATE, UNSET, default=[])
+        else:
+            if ON_SUCCESS in action or ON_FAIL in action:
+                raise AdcmEx(
+                    "INVALID_OBJECT_DEFINITION",
+                    f"Action {action_name} uses \"on_success/on_fail\" states without \"masking\"",
+                )
+            action_data.state_available = _deep_get(action, STATES, AVAILABLE, default=[])
+            action_data.state_unavailable = []
+            action_data.state_on_success = _deep_get(action, STATES, ON_SUCCESS, default="")
+            action_data.state_on_fail = _deep_get(action, STATES, ON_FAIL, default="")
+
+            action_data.multi_state_available = ANY
+            action_data.multi_state_unavailable = []
+            action_data.multi_state_on_success_set = []
+            action_data.multi_state_on_success_unset = []
+            action_data.multi_state_on_fail_set = []
+            action_data.multi_state_on_fail_unset = []
+
+        # TODO: cm.stack.save_sub_actions
+        # TODO: cm.stack.save_prototype_config
+
+        return action_data
+
+    @staticmethod
+    def _get_fixed_action_hc_acl(prototype: PrototypeData, action: dict) -> List[dict]:
+        hostcomponentmap = deepcopy(action.get("hc_acl", []))
+
+        for idx, item in enumerate(hostcomponentmap):
+            if "service" not in item:
+                if prototype.type == "service":
+                    item["service"] = prototype.name
+                    action["hc_acl"][idx]["service"] = prototype.name
+
+        return hostcomponentmap
 
 
 STAGE = (  # TODO: remove
