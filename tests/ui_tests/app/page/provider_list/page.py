@@ -21,7 +21,6 @@ from adcm_pytest_plugin.utils import wait_until_step_succeeds
 from selenium.webdriver.remote.webelement import WebElement
 from tests.ui_tests.app.page.common.base_page import BasePageObject
 from tests.ui_tests.app.page.common.dialogs.locators import ActionDialog, DeleteDialog
-from tests.ui_tests.app.page.common.popups.page import HostCreatePopupObj
 from tests.ui_tests.app.page.common.table.page import CommonTableObj
 from tests.ui_tests.app.page.common.tooltip_links.page import CommonToolbar
 from tests.ui_tests.app.page.host_list.locators import HostListLocators
@@ -44,7 +43,6 @@ class ProviderListPage(BasePageObject):
         super().__init__(driver, base_url, "/provider")
         self.toolbar = CommonToolbar(self.driver, self.base_url)
         self.table = CommonTableObj(driver=self.driver, locators_class=HostListLocators.HostTable)
-        self.host_popup = HostCreatePopupObj(self.driver, self.base_url)
 
     @allure.step("Create provider")
     def create_provider(self, bundle: str, name: Optional[str] = None, description: Optional[str] = None):

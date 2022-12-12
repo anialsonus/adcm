@@ -31,6 +31,13 @@ from tests.ui_tests.app.page.common.common_locators import (
 )
 from tests.ui_tests.app.page.common.configuration.locators import CommonConfigMenu
 from tests.ui_tests.app.page.common.configuration.page import CommonConfigMenuObj
+from tests.ui_tests.app.page.common.dialogs.create_host import HostCreateDialog
+from tests.ui_tests.app.page.common.dialogs.create_host_locators import (
+    HostAddPopupLocators,
+    HostCreationLocators,
+    ListConcernPopupLocators,
+    PageConcernPopupLocators,
+)
 from tests.ui_tests.app.page.common.dialogs.locators import ActionDialog, DeleteDialog
 from tests.ui_tests.app.page.common.group_config.page import CommonGroupConfigMenu
 from tests.ui_tests.app.page.common.group_config_list.locators import (
@@ -43,13 +50,6 @@ from tests.ui_tests.app.page.common.host_components.locators import (
 from tests.ui_tests.app.page.common.host_components.page import HostComponentsPage
 from tests.ui_tests.app.page.common.import_page.locators import ImportLocators
 from tests.ui_tests.app.page.common.import_page.page import ImportPage
-from tests.ui_tests.app.page.common.popups.locator import (
-    HostAddPopupLocators,
-    HostCreationLocators,
-    ListConcernPopupLocators,
-    PageConcernPopupLocators,
-)
-from tests.ui_tests.app.page.common.popups.page import HostCreatePopupObj
 from tests.ui_tests.app.page.common.status.page import StatusPage
 from tests.ui_tests.app.page.common.table.locator import CommonTable
 from tests.ui_tests.app.page.common.table.page import CommonTableObj
@@ -77,7 +77,6 @@ class CommonClusterPage(BasePageObject):  # pylint: disable=too-many-instance-at
     config: CommonConfigMenuObj
     toolbar: CommonToolbar
     table: CommonTableObj
-    host_popup: HostCreatePopupObj
     group_config = GroupConfigList
 
     def __init__(self, driver, base_url, cluster_id: int, **kwargs):
@@ -88,7 +87,6 @@ class CommonClusterPage(BasePageObject):  # pylint: disable=too-many-instance-at
         self.cluster_id = cluster_id
         self.toolbar = CommonToolbar(self.driver, self.base_url)
         self.table = CommonTableObj(driver=self.driver)
-        self.host_popup = HostCreatePopupObj(self.driver, self.base_url)
         self.group_config = GroupConfigList(self.driver, self.base_url)
 
     def open_main_tab(self):
@@ -355,7 +353,7 @@ class ClusterHostPage(CommonClusterPage):
     ]
 
     @allure.step("Click on add host button")
-    def click_add_host_btn(self, is_not_first_host: bool = True):
+    def click_add_host_btn(self, is_not_first_host: bool = True) -> HostCreateDialog:
         """
         Click on the button 'Add host' under the host table.
         In case there are any hosts that have been added earlier
@@ -371,6 +369,7 @@ class ClusterHostPage(CommonClusterPage):
         self.wait_element_visible(HostCreationLocators.block)
         if is_not_first_host:
             self.wait_element_visible(HostAddPopupLocators.add_new_host_btn).click()
+        return HostCreateDialog(driver=self.driver)
 
     @allure.step("Get info about host row")
     def get_host_info_from_row(self, row_num: int = 0, table_has_cluster_column: bool = True) -> HostRowInfo:

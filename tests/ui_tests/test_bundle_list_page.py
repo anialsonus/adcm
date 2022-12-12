@@ -237,7 +237,9 @@ def test_upload_provider_bundle_from_another_page(
     _check_bundle_list_is_empty(page)
     with allure.step('Create bundle from host creation popup'):
         host_list_page = HostListPage(app_fs.driver, app_fs.adcm.url).open()
-        host_list_page.upload_bundle_from_host_create_popup(create_bundle_archives[0])
+        dialog = host_list_page.open_host_creation_popup()
+        dialog.upload_bundle(create_bundle_archives[0])
+        dialog.close()
     _open_bundle_list_and_check_info(page, expected_info)
 
 

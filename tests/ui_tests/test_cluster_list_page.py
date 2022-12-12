@@ -607,8 +607,8 @@ class TestClusterHostPage:
         cluster, _ = create_community_cluster_with_service
         cluster_host_page = ClusterHostPage(app_fs.driver, app_fs.adcm.url, cluster.id).open()
         cluster_host_page.wait_page_is_opened()
-        cluster_host_page.click_add_host_btn(is_not_first_host=False)
-        new_provider_name = cluster_host_page.host_popup.create_provider_and_host(bundle_archive, HOST_NAME)
+        dialog = cluster_host_page.click_add_host_btn(is_not_first_host=False)
+        new_provider_name = dialog.create_provider_and_host(bundle_archive, HOST_NAME)
         expected_values = {
             'fqdn': HOST_NAME,
             'provider': new_provider_name,
@@ -635,8 +635,8 @@ class TestClusterHostPage:
         cluster, _ = create_community_cluster_with_service
         cluster_host_page = ClusterHostPage(app_fs.driver, app_fs.adcm.url, cluster.id).open()
         cluster_host_page.wait_page_is_opened()
-        cluster_host_page.click_add_host_btn(is_not_first_host=False)
-        cluster_host_page.host_popup.create_host(HOST_NAME)
+        dialog = cluster_host_page.click_add_host_btn(is_not_first_host=False)
+        dialog.create_host(HOST_NAME)
         wait_and_assert_ui_info(
             expected_values,
             cluster_host_page.get_host_info_from_row,
@@ -654,8 +654,8 @@ class TestClusterHostPage:
         cluster_host_page = ClusterHostPage(app_fs.driver, app_fs.adcm.url, cluster.id).open()
         cluster_host_page.wait_page_is_opened()
         cluster_host_page.close_info_popup()
-        cluster_host_page.click_add_host_btn()
-        cluster_host_page.host_popup.create_host(HOST_NAME)
+        dialog = cluster_host_page.click_add_host_btn()
+        dialog.create_host(HOST_NAME)
         with allure.step("Check error message"):
             assert (
                 cluster_host_page.get_info_popup_text() == '[ CONFLICT ] HOST_CONFLICT -- duplicate host'
@@ -787,8 +787,8 @@ class TestClusterComponentsPage:
         cluster_components_page = ClusterComponentsPage(
             app_fs.driver, app_fs.adcm.url, create_community_cluster.id
         ).open()
-        cluster_components_page.click_add_host_btn()
-        cluster_components_page.host_popup.create_provider_and_host(bundle_path=bundle_archive, fqdn=HOST_NAME)
+        dialog = cluster_components_page.click_add_host_btn()
+        dialog.create_provider_and_host(bundle_path=bundle_archive, fqdn=HOST_NAME)
         host_row = cluster_components_page.get_host_rows()[0]
         check_components_host_info(cluster_components_page.get_row_info(host_row), HOST_NAME, "0")
 

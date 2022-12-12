@@ -182,8 +182,8 @@ class TestHostListPage:
         """Upload bundle and create host"""
 
         host_fqdn = 'howdy-host-fqdn'
-        page.open_host_creation_popup()
-        new_provider_name = page.host_popup.create_provider_and_host(bundle_archive, host_fqdn)
+        creation_dialog = page.open_host_creation_popup()
+        new_provider_name = creation_dialog.create_provider_and_host(bundle_archive, host_fqdn)
         expected_values = {
             'fqdn': host_fqdn,
             'provider': new_provider_name,
@@ -219,12 +219,10 @@ class TestHostListPage:
     def _create_host_bonded_to_cluster(page: HostListPage, fqdn: str) -> None:
         host_bonding_retry = RetryFromCheckpoint(
             execution_steps=[
-                Step(page.open_host_creation_popup),
-                Step(page.host_popup.create_host, [fqdn], {"cluster": CLUSTER_NAME}),
+                Step(lambda: page.open_host_creation_popup().create_host(fqdn, cluster=CLUSTER_NAME)),
             ],
             restoration_steps=[
                 Step(page.driver.refresh),
-                Step(page.open_host_creation_popup),
             ],
         )
         with allure.step("Try to bound host to cluster during new host creation"):
@@ -249,8 +247,8 @@ class TestHostListPage:
             'cluster': None,
             'state': 'created',
         }
-        page.open_host_creation_popup()
-        page.host_popup.create_host(HOST_FQDN)
+        dialog = page.open_host_creation_popup()
+        dialog.create_host(HOST_FQDN)
         with allure.step("Check host is created and isn't bound to a cluster"):
             wait_and_assert_ui_info(
                 expected_values,
@@ -304,8 +302,8 @@ class TestHostListPage:
         """Host shouldn't be deleted"""
 
         check_element_is_visible(page, HostListLocators.HostTable.row)
-        page.open_host_creation_popup()
-        page.host_popup.create_host(HOST_FQDN, cluster=CLUSTER_NAME)
+        dialog = page.open_host_creation_popup()
+        dialog.create_host(HOST_FQDN, cluster=CLUSTER_NAME)
         page.delete_host(0)
         check_element_is_visible(page, HostListLocators.HostTable.row)
 

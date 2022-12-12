@@ -32,11 +32,13 @@ from tests.ui_tests.app.page.admin.locators import (
 from tests.ui_tests.app.page.common.base_page import BasePageObject
 from tests.ui_tests.app.page.common.common_locators import ObjectPageMenuLocators
 from tests.ui_tests.app.page.common.configuration.page import CommonConfigMenuObj
+from tests.ui_tests.app.page.common.dialogs.create_host_locators import (
+    CommonPopupLocators,
+)
 from tests.ui_tests.app.page.common.dialogs.locators import DeleteDialog
 from tests.ui_tests.app.page.common.dialogs.operation_changes import (
     OperationChangesDialog,
 )
-from tests.ui_tests.app.page.common.popups.locator import CommonPopupLocators
 from tests.ui_tests.app.page.common.table.locator import CommonTable
 from tests.ui_tests.app.page.common.table.page import CommonTableObj
 from tests.ui_tests.app.page.common.tooltip_links.locator import CommonToolbarLocators
