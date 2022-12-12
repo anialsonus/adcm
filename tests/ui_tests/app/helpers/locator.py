@@ -10,30 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Base classes for locators"""
+"""Old style locators"""
 
 from dataclasses import dataclass
 
 
-@dataclass
-class Locator:
-    """Describes a locator on a webpage"""
-
+@dataclass()
+class BaseLocator:
     by: str
     value: str
     name: str
 
     def __repr__(self):
         return self.name
-
-
-@dataclass
-class TemplateLocator(Locator):
-    """
-    Similar to Locator, but with template in `value`
-    and ability to generate Locators from template
-    """
-
-    def __call__(self, *args) -> Locator:
-        """Get regular Locator by passing arguments to format function"""
-        return Locator(by=self.by, value=self.value.format(*args), name=self.name.format(*args))

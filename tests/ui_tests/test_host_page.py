@@ -26,7 +26,6 @@ from selenium.common import StaleElementReferenceException
 from tests.library.retry import RetryFromCheckpoint, Step
 from tests.library.status import ADCMObjectStatusChanger
 from tests.ui_tests.app.app import ADCMTest
-from tests.ui_tests.app.checks import check_element_is_hidden, check_element_is_visible
 from tests.ui_tests.app.page.admin.page import AdminIntroPage
 from tests.ui_tests.app.page.common.configuration.locators import CommonConfigMenu
 from tests.ui_tests.app.page.common.configuration.page import CONFIG_ITEMS
@@ -43,6 +42,7 @@ from tests.ui_tests.app.page.host.page import (
 )
 from tests.ui_tests.app.page.host_list.locators import HostListLocators
 from tests.ui_tests.app.page.host_list.page import HostListPage
+from tests.ui_tests.core.checks import check_element_is_hidden, check_element_is_visible
 from tests.ui_tests.utils import expect_rows_amount_change, wait_and_assert_ui_info
 
 # defaults

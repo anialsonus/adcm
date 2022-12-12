@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import allure
-from tests.ui_tests.app.helpers.locator import Locator
+from tests.ui_tests.app.helpers.locator import BaseLocator
 from tests.ui_tests.app.page.common.base_page import BasePageObject
 from tests.ui_tests.app.page.common.common_locators import ObjectPageLocators
 from tests.ui_tests.app.page.common.tooltip_links.locator import CommonToolbarLocators
@@ -92,7 +92,7 @@ class JobPageMixin(BasePageObject):
         locator = getattr(JobPageLocators.Menu, f'{log_type}_download_btn')
         self.find_and_click(locator)
 
-    def _open_menu(self, locator: Locator):
+    def _open_menu(self, locator: BaseLocator):
         self.find_and_click(locator)
         self.wait_element_attribute(locator, 'class', 'active', exact_match=False)
         self.wait_element_hide(CommonToolbarLocators.progress_bar)

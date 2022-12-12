@@ -14,18 +14,16 @@
 
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 import allure
 from adcm_pytest_plugin.utils import wait_until_step_succeeds
 from selenium.webdriver.remote.webdriver import WebElement
-from tests.ui_tests.app.checks import check_elements_are_displayed
-from tests.ui_tests.app.page.cluster.components import ComponentRow
+from tests.ui_tests.app.page.cluster.elements import ComponentRow, ServiceRow
 from tests.ui_tests.app.page.cluster.locators import (
     ClusterHostLocators,
     ClusterServicesLocators,
 )
-from tests.ui_tests.app.page.cluster.services import ServiceRow
 from tests.ui_tests.app.page.common.base_page import BaseDetailedPage, BasePageObject
 from tests.ui_tests.app.page.common.common_locators import (
     ObjectPageLocators,
@@ -57,6 +55,8 @@ from tests.ui_tests.app.page.common.table.locator import CommonTable
 from tests.ui_tests.app.page.common.table.page import CommonTableObj
 from tests.ui_tests.app.page.common.tooltip_links.page import CommonToolbar
 from tests.ui_tests.app.page.host_list.page import HostRowInfo
+from tests.ui_tests.core.checks import check_elements_are_displayed
+from tests.ui_tests.core.elements import ObjectRowMixin
 
 
 @dataclass
@@ -175,9 +175,10 @@ class ClusterMainPage(CommonClusterPage, BaseDetailedPage):
     ]
 
 
-class ClusterServicesPage(CommonClusterPage):
+class ClusterServicesPage(CommonClusterPage, ObjectRowMixin):
     """Cluster page services menu"""
 
+    ROW_CLASS = ServiceRow
     MENU_SUFFIX = 'service'
     MAIN_ELEMENTS = [
         ObjectPageLocators.title,
@@ -187,25 +188,6 @@ class ClusterServicesPage(CommonClusterPage):
         CommonTable.Pagination.next_page,
         CommonTable.Pagination.previous_page,
     ]
-
-    def get_row(self, predicate: Callable[[ServiceRow], bool]) -> ServiceRow:
-        suitable_rows = self.get_rows(predicate=predicate)
-
-        if suitable_rows:
-            return suitable_rows[0]
-
-        raise AssertionError("No suitable service row found")
-
-    def get_rows(self, predicate: Callable[[ServiceRow], bool] = lambda _: True) -> tuple[ServiceRow, ...]:
-        return tuple(
-            filter(
-                predicate,
-                map(
-                    lambda element: ServiceRow(row_element=element, driver=self._driver),
-                    self.table.get_all_rows(timeout=1),
-                ),
-            )
-        )
 
     def click_add_service_btn(self):
         """Click on Add service button"""
@@ -283,7 +265,9 @@ class ClusterServicesPage(CommonClusterPage):
         wait_until_step_succeeds(_wait_state, period=1, timeout=self.default_loc_timeout)
 
 
-class ServiceComponentsPage(BasePageObject):
+class ServiceComponentsPage(BasePageObject, ObjectRowMixin):
+    ROW_CLASS = ComponentRow
+
     def __init__(self, driver, base_url, cluster_id: int, service_id: int):
         super().__init__(
             driver,
@@ -293,25 +277,6 @@ class ServiceComponentsPage(BasePageObject):
             service_id=service_id,
         )
         self.table = CommonTableObj(self.driver, self.base_url)
-
-    def get_row(self, predicate: Callable[[ComponentRow], bool]) -> ComponentRow:
-        suitable_rows = self.get_rows(predicate=predicate)
-
-        if suitable_rows:
-            return suitable_rows[0]
-
-        raise AssertionError("No suitable component row found")
-
-    def get_rows(self, predicate: Callable[[ComponentRow], bool] = lambda _: True) -> tuple[ComponentRow, ...]:
-        return tuple(
-            filter(
-                predicate,
-                map(
-                    lambda element: ComponentRow(row_element=element, driver=self._driver),
-                    self.table.get_all_rows(timeout=1),
-                ),
-            )
-        )
 
 
 class ClusterImportPage(CommonClusterPage, ImportPage):

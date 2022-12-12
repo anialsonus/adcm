@@ -21,7 +21,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait as WDW
-from tests.ui_tests.app.helpers.locator import Locator
+from tests.ui_tests.app.helpers.locator import BaseLocator
 from tests.ui_tests.app.page.common.base_page import BasePageObject
 from tests.ui_tests.app.page.common.dialogs.locators import ActionDialog, DeleteDialog
 from tests.ui_tests.app.page.common.dialogs.rename import RenameDialog
@@ -78,7 +78,7 @@ class HostListPage(BasePageObject):  # pylint: disable=too-many-public-methods
         )
 
     @allure.step('Click on cell {child_locator} (row #{row_num})')
-    def click_on_row_child(self, row_num: int, child_locator: Locator):
+    def click_on_row_child(self, row_num: int, child_locator: BaseLocator):
         """Click on row child"""
         row = self.table.get_row(row_num)
         self.find_child(row, child_locator).click()
@@ -299,7 +299,7 @@ class HostListPage(BasePageObject):  # pylint: disable=too-many-public-methods
         self._wait_and_click_on_cluster_option(cluster_name, option)
         self.wait_element_hide(option)
 
-    def _wait_and_click_on_cluster_option(self, cluster_name: str, option_locator: Locator):
+    def _wait_and_click_on_cluster_option(self, cluster_name: str, option_locator: BaseLocator):
         WDW(self.driver, self.default_loc_timeout).until(
             EC.presence_of_element_located([option_locator.by, option_locator.value.format(cluster_name)]),
             message=f"Can't find cluster with name {cluster_name} "

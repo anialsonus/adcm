@@ -13,11 +13,11 @@
 """Footer locators"""
 
 from selenium.webdriver.common.by import By
-from tests.ui_tests.app.helpers.locator import Locator
+from tests.ui_tests.app.helpers.locator import BaseLocator
 
 
 class CommonFooterLocators:
     """ADCM footer locators"""
 
-    version_link = Locator(By.CSS_SELECTOR, "footer a[href*='docs']", "Link to version doc page")
-    logo = Locator(By.XPATH, "//footer//*[contains(text(), 'ARENADATA ©')]", "Footer logo")
+    version_link = BaseLocator(By.CSS_SELECTOR, "footer a[href*='docs']", "Link to version doc page")
+    logo = BaseLocator(By.XPATH, "//footer//*[contains(text(), 'ARENADATA ©')]", "Footer logo")

@@ -20,7 +20,7 @@ import allure
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webelement import WebElement
 from tests.library.conditional_retriever import DataSource, FromOneOf
-from tests.ui_tests.app.helpers.locator import Locator
+from tests.ui_tests.app.helpers.locator import BaseLocator
 from tests.ui_tests.app.page.common.base_page import BasePageObject
 from tests.ui_tests.app.page.common.header_locators import AuthorizedHeaderLocators
 from tests.ui_tests.app.page.common.table.page import CommonTableObj
@@ -184,7 +184,7 @@ class JobListPage(BasePageObject):
         """Show only failed tasks"""
         self._select_filter(TaskListLocators.Filter.failed)
 
-    def _select_filter(self, filter_locator: Locator):
+    def _select_filter(self, filter_locator: BaseLocator):
         """Click on filter tab and wait it is pressed"""
         self.find_and_click(filter_locator)
         self.wait_element_attribute(filter_locator, 'aria-pressed', "true")

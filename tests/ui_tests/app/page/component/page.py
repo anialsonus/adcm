@@ -13,7 +13,6 @@
 """Component page PageObjects classes"""
 
 import allure
-from tests.ui_tests.app.checks import check_elements_are_displayed
 from tests.ui_tests.app.page.common.base_page import BaseDetailedPage, BasePageObject
 from tests.ui_tests.app.page.common.common_locators import (
     ObjectPageLocators,
@@ -31,6 +30,7 @@ from tests.ui_tests.app.page.common.table.locator import CommonTable
 from tests.ui_tests.app.page.common.table.page import CommonTableObj
 from tests.ui_tests.app.page.common.tooltip_links.locator import CommonToolbarLocators
 from tests.ui_tests.app.page.common.tooltip_links.page import CommonToolbar
+from tests.ui_tests.core.checks import check_elements_are_displayed
 
 
 class ComponentPageMixin(BasePageObject):

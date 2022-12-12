@@ -28,9 +28,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait as WDW
-from tests.ui_tests.app.checks import check_elements_are_displayed
-from tests.ui_tests.app.core import Interactor
-from tests.ui_tests.app.helpers.locator import Locator
+from tests.ui_tests.app.helpers.locator import BaseLocator
 from tests.ui_tests.app.page.common.common_locators import (
     CommonLocators,
     ObjectPageLocators,
@@ -42,6 +40,8 @@ from tests.ui_tests.app.page.common.header_locators import (
 )
 from tests.ui_tests.app.page.common.popups.locator import CommonPopupLocators
 from tests.ui_tests.app.page.common.tooltip_links.locator import CommonToolbarLocators
+from tests.ui_tests.core.checks import check_elements_are_displayed
+from tests.ui_tests.core.interactors import Interactor
 from tests.ui_tests.utils import assert_enough_rows
 
 
@@ -159,7 +159,7 @@ class BasePageObject(Interactor):
     @allure.step('Write text to input element: "{text}"')
     def send_text_to_element(
         self,
-        element: Union[Locator, WebElement],
+        element: Union[BaseLocator, WebElement],
         text: str,
         clean_input: bool = True,
         timeout: Optional[int] = None,
@@ -179,18 +179,18 @@ class BasePageObject(Interactor):
         def _send_keys_and_check():
             if clean_input:
                 self.clear_by_keys(element)
-            input_element = self.find_element(element, timeout) if isinstance(element, Locator) else element
+            input_element = self.find_element(element, timeout) if isinstance(element, BaseLocator) else element
             input_element.click()
             input_element.send_keys(text)
             assert (actual_value := input_element.get_property('value')) == text, (
-                f'Value of input {element.name if isinstance(element, Locator) else element.text} '
+                f'Value of input {element.name if isinstance(element, BaseLocator) else element.text} '
                 f'expected to be "{text}", but "{actual_value}" was found'
             )
 
         wait_until_step_succeeds(_send_keys_and_check, period=0.5, timeout=1.5)
 
     @allure.step('Clear element')
-    def clear_by_keys(self, element: Union[Locator, WebElement]) -> None:
+    def clear_by_keys(self, element: Union[BaseLocator, WebElement]) -> None:
         """Clears element value by keyboard."""
 
         def _clear():
@@ -213,7 +213,7 @@ class BasePageObject(Interactor):
         self.driver.refresh()
 
     @allure.step('Scroll to element')
-    def scroll_to(self, locator: Union[Locator, WebElement]) -> WebElement:
+    def scroll_to(self, locator: Union[BaseLocator, WebElement]) -> WebElement:
         """Scroll to element"""
         element = locator if isinstance(locator, WebElement) else self.find_element(locator)
         # Hack for firefox because of move_to_element does not scroll to the element
