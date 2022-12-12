@@ -95,7 +95,7 @@ class GeneralAdminPage(BasePageObject):
             raise AttributeError('You should explicitly set MENU_SUFFIX in class definition')
         super().__init__(driver, base_url, "/admin/" + self.MENU_SUFFIX)
         self.config = CommonConfigMenuObj(self.driver, self.base_url)
-        self.table = CommonTableObj(self.driver, self.base_url)
+        self.table = CommonTableObj(driver=self.driver)
         self.toolbar = CommonToolbar(self.driver, self.base_url)
 
     @allure.step("Assert that all main elements are presented on the page")
@@ -549,7 +549,7 @@ class AdminRolesPage(GeneralAdminPage):
         AdminRolesLocators.create_btn,
         AdminRolesLocators.delete_btn,
         CommonTable.header,
-        CommonTable.visible_row,
+        CommonTable.row,
     ]
 
     def get_all_roles_info(self) -> [AdminRoleInfo]:

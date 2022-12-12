@@ -4,7 +4,7 @@ from typing import Any, Callable, Iterable, Protocol, Type, TypeVar
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from tests.ui_tests.core.interactors import Interactor
-from tests.ui_tests.core.locators import Descriptor, Locator
+from tests.ui_tests.core.locators import BaseLocator, Descriptor, Locator
 
 
 class AutoChildElement:
@@ -39,9 +39,29 @@ class AutoChildElement:
 
         return super().__new__(cls)
 
-    def __init__(self, parent_element: WebElement, driver: WebDriver):
+    def __init__(
+        self, parent_element: WebElement, driver: WebDriver | None = None, interactor: Interactor | None = None
+    ):
+        if not (driver or interactor):
+            raise RuntimeError("Either driver or interactor should be provided")
+
         self._element = parent_element
-        self._view = Interactor(driver=driver, default_timeout=0.5)
+        self._view = interactor or Interactor(driver=driver, default_timeout=0.5)
+
+
+class DialogLocatorsLike(Protocol):
+    body: BaseLocator
+
+
+class AutoChildDialog(AutoChildElement):
+
+    Locators: DialogLocatorsLike
+
+    @classmethod
+    def wait_opened(cls, driver: WebDriver):
+        interactor = Interactor(driver=driver, default_timeout=0.5)
+        interactor.wait_element_visible(cls.Locators.body, timeout=5)
+        return cls(parent_element=interactor.find_element(cls.Locators.body), interactor=interactor)
 
 
 def _build_property(locator: Locator, retrieve: Callable[[WebElement], Any] = lambda element: element) -> property:

@@ -22,10 +22,6 @@ from adcm_pytest_plugin import params, utils
 from adcm_pytest_plugin.utils import get_data_dir, parametrize_by_data_subdirs
 from selenium.common.exceptions import TimeoutException
 from tests.library.status import ADCMObjectStatusChanger
-from tests.ui_tests.app.helpers.configs_generator import (
-    generate_configs,
-    prepare_config,
-)
 from tests.ui_tests.app.page.admin.page import AdminIntroPage
 from tests.ui_tests.app.page.cluster.page import (
     ClusterComponentsPage,
@@ -55,6 +51,8 @@ from tests.ui_tests.app.page.service.page import (
     ServiceImportPage,
     ServiceMainPage,
 )
+from tests.ui_tests.core.checks import check_pagination
+from tests.ui_tests.generator_helper import generate_configs, prepare_config
 from tests.ui_tests.utils import (
     check_host_value,
     create_few_groups,
@@ -264,7 +262,7 @@ class TestClusterListPage:
                 bundle.cluster_create(name=f"{CLUSTER_NAME} {i}")
         cluster_page = ClusterListPage(app_fs.driver, app_fs.adcm.url).open()
         cluster_page.close_info_popup()
-        cluster_page.table.check_pagination(second_page_item_amount=1)
+        check_pagination(cluster_page.table, expected_on_second=1)
 
     @pytest.mark.smoke()
     @pytest.mark.include_firefox()
@@ -571,7 +569,7 @@ class TestClusterServicePage:
         except TimeoutException:
             cluster_service_page.driver.refresh()
             cluster_service_page.wait_page_is_opened(timeout=30)
-        cluster_service_page.table.check_pagination(second_page_item_amount=2)
+        check_pagination(cluster_service_page.table, expected_on_second=2)
 
     def test_delete_service_on_service_list_page(self, app_fs, create_community_cluster_with_service):
         """Test delete service from cluster/{}/service page"""
@@ -735,7 +733,7 @@ class TestClusterHostPage:
                 host = provider.host_create(f"{HOST_NAME}-{i}")
                 cluster.host_add(host)
         cluster_host_page = ClusterHostPage(app_fs.driver, app_fs.adcm.url, 1).open()
-        cluster_host_page.table.check_pagination(1)
+        check_pagination(cluster_host_page.table, expected_on_second=1)
         cluster_host_page.check_cluster_toolbar(CLUSTER_NAME)
 
     @pytest.mark.smoke()
@@ -1225,7 +1223,7 @@ class TestClusterGroupConfigPage:
 
         group_conf_page = ClusterGroupConfigPage(app_fs.driver, app_fs.adcm.url, create_community_cluster.id).open()
         create_few_groups(group_conf_page.group_config)
-        group_conf_page.table.check_pagination(second_page_item_amount=1)
+        check_pagination(group_conf_page.table, expected_on_second=1)
 
     # pylint: disable=too-many-locals, undefined-loop-variable, too-many-statements
 
@@ -1405,8 +1403,8 @@ class TestClusterRenaming:
         new_name = "Hahahah"
 
         dialog = page.open_rename_cluster_dialog(page.get_row_by_cluster_name(cluster.name))
-        dialog.set_new_name_in_rename_dialog(new_name)
-        dialog.click_save_on_rename_dialog()
+        dialog.set_new_name(new_name)
+        dialog.save()
         with allure.step("Check name of cluster in table"):
             name_in_row = page.get_cluster_info_from_row(0)["name"]
             assert name_in_row == new_name, f"Incorrect cluster name, expected: {new_name}"
@@ -1425,14 +1423,12 @@ class TestClusterRenaming:
 
         for cluster_name in incorrect_names:
             with allure.step(f"Check if printing cluster name '{cluster_name}' triggers a warning message"):
-                dialog.set_new_name_in_rename_dialog(dummy_name)
-                dialog.set_new_name_in_rename_dialog(cluster_name)
-                assert dialog.is_dialog_error_message_visible(), "Error about incorrect name should be visible"
-                assert (
-                    dialog.get_dialog_error_message() == self.EXPECTED_ERROR
-                ), f"Incorrect error message, expected: {self.EXPECTED_ERROR}"
+                dialog.set_new_name(dummy_name)
+                dialog.set_new_name(cluster_name)
+                assert dialog.is_error_message_visible(), "Error about incorrect name should be visible"
+                assert dialog.error == self.EXPECTED_ERROR, f"Incorrect error message, expected: {self.EXPECTED_ERROR}"
 
-        dialog.click_cancel_on_rename_dialog()
+        dialog.cancel()
 
     def _test_an_error_is_not_shown_on_correct_char_in_name(self, cluster: Cluster, page: ClusterListPage) -> None:
         dummy_name = "clUster"
@@ -1445,10 +1441,10 @@ class TestClusterRenaming:
 
         for cluster_name in correct_names:
             with allure.step(f"Check if printing cluster name '{cluster_name}' shows no error"):
-                dialog.set_new_name_in_rename_dialog(dummy_name)
-                dialog.set_new_name_in_rename_dialog(cluster_name)
-                assert not dialog.is_dialog_error_message_visible(), "Error about correct name should not be shown"
-                dialog.click_save_on_rename_dialog()
+                dialog.set_new_name(dummy_name)
+                dialog.set_new_name(cluster_name)
+                assert not dialog.is_error_message_visible(), "Error about correct name should not be shown"
+                dialog.save()
                 name_in_row = page.get_cluster_info_from_row(0)["name"]
                 assert name_in_row == cluster_name, f"Incorrect cluster name, expected: {cluster_name}"
                 dialog = page.open_rename_cluster_dialog(page.get_row_by_cluster_name(cluster_name))

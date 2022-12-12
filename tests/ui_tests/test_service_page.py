@@ -40,6 +40,7 @@ from tests.ui_tests.app.page.service.page import (
     ServiceMainPage,
     ServiceStatusPage,
 )
+from tests.ui_tests.core.checks import check_pagination
 from tests.ui_tests.test_cluster_list_page import (
     BUNDLE_COMMUNITY,
     BUNDLE_IMPORT,
@@ -539,7 +540,7 @@ class TestServiceGroupConfigPage:
         cluster, service = create_cluster_with_service
         group_conf_page = ServiceGroupConfigPage(app_fs.driver, app_fs.adcm.url, cluster.id, service.id).open()
         create_few_groups(group_conf_page.group_config)
-        group_conf_page.table.check_pagination(second_page_item_amount=1)
+        check_pagination(group_conf_page.table, expected_on_second=1)
 
 
 class TestServiceStatusPage:

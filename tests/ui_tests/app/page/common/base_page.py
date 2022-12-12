@@ -24,6 +24,7 @@ from selenium.common.exceptions import (
     TimeoutException,
 )
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from selenium.webdriver.support import expected_conditions as EC
@@ -32,7 +33,6 @@ from tests.ui_tests.app.page.common.common_locators import (
     CommonLocators,
     ObjectPageLocators,
 )
-from tests.ui_tests.app.page.common.footer_locators import CommonFooterLocators
 from tests.ui_tests.app.page.common.header_locators import (
     AuthorizedHeaderLocators,
     CommonHeaderLocators,
@@ -41,7 +41,7 @@ from tests.ui_tests.app.page.common.popups.locator import CommonPopupLocators
 from tests.ui_tests.app.page.common.tooltip_links.locator import CommonToolbarLocators
 from tests.ui_tests.core.checks import check_elements_are_displayed
 from tests.ui_tests.core.interactors import Interactor
-from tests.ui_tests.core.locators import BaseLocator
+from tests.ui_tests.core.locators import BaseLocator, Locator, autoname
 from tests.ui_tests.utils import assert_enough_rows
 
 
@@ -494,19 +494,24 @@ class Header(Interactor):  # pylint: disable=too-many-public-methods
 
 
 class Footer(Interactor):
+    @autoname
+    class Locators:
+        version_link = Locator(By.CSS_SELECTOR, "footer a[href*='docs']", name="Link to version doc page")
+        logo = Locator(By.XPATH, "//footer//*[contains(text(), 'ARENADATA ©')]")
+
     @allure.step("Check elements in footer")
     def check_all_elements(self):
         check_elements_are_displayed(
             self,
             [
-                CommonFooterLocators.version_link,
-                CommonFooterLocators.logo,
+                self.Locators.version_link,
+                self.Locators.logo,
             ],
         )
 
     @allure.step("Click on version link in footer")
     def click_version_link_in_footer(self):
-        self.find_and_click(CommonFooterLocators.version_link)
+        self.find_and_click(self.Locators.version_link)
 
 
 class BaseDetailedPage(BasePageObject):

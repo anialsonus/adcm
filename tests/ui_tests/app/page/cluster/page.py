@@ -87,7 +87,7 @@ class CommonClusterPage(BasePageObject):  # pylint: disable=too-many-instance-at
         self.config = CommonConfigMenuObj(self.driver, self.base_url)
         self.cluster_id = cluster_id
         self.toolbar = CommonToolbar(self.driver, self.base_url)
-        self.table = CommonTableObj(self.driver, self.base_url)
+        self.table = CommonTableObj(driver=self.driver)
         self.host_popup = HostCreatePopupObj(self.driver, self.base_url)
         self.group_config = GroupConfigList(self.driver, self.base_url)
 
@@ -276,7 +276,7 @@ class ServiceComponentsPage(BasePageObject, ObjectRowMixin):
             cluster_id=cluster_id,
             service_id=service_id,
         )
-        self.table = CommonTableObj(self.driver, self.base_url)
+        self.table = CommonTableObj(driver=self.driver)
 
 
 class ClusterImportPage(CommonClusterPage, ImportPage):
@@ -559,7 +559,7 @@ class ClusterGroupConfigPageMixin(BasePageObject):  # pylint: disable-next=too-m
         self.cluster_id = cluster_id
         self.group_config_id = group_config_id
         self.toolbar = CommonToolbar(self.driver, self.base_url)
-        self.table = CommonTableObj(self.driver, self.base_url)
+        self.table = CommonTableObj(driver=self.driver)
 
     @allure.step("Assert that all main elements on the page are presented")
     def check_all_elements(self):

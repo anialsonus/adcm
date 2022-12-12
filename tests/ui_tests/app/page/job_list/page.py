@@ -70,7 +70,7 @@ class JobListPage(BasePageObject):
 
     def __init__(self, driver, base_url):
         super().__init__(driver, base_url, "/task")
-        self.table = CommonTableObj(self.driver, self.base_url, TaskListLocators.Table)
+        self.table = CommonTableObj(driver=self.driver, locators_class=TaskListLocators.Table)
 
     def get_task_info_from_table(self, row_num: int = 0, *, full_invoker_objects_link: bool = False) -> TableTaskInfo:
         """

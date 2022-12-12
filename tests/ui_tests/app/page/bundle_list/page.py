@@ -38,7 +38,7 @@ class BundleListPage(BasePageObject):
 
     def __init__(self, driver, base_url):
         super().__init__(driver, base_url, "/bundle")
-        self.table = CommonTableObj(self.driver, self.base_url, BundleListLocators.Table)
+        self.table = CommonTableObj(driver=self.driver, locators_class=BundleListLocators.Table)
 
     @allure.step('Get bundle information from row #{row_num}')
     def get_bundle_info(self, row_num: int = 0) -> BundleInfo:

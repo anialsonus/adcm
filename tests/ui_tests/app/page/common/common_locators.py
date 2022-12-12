@@ -13,7 +13,7 @@
 """Common locators"""
 
 from selenium.webdriver.common.by import By
-from tests.ui_tests.core.locators import BaseLocator
+from tests.ui_tests.core.locators import BaseLocator, Descriptor, Locator, autoname
 
 
 class CommonLocators:
@@ -25,12 +25,13 @@ class CommonLocators:
     mat_slide_toggle = BaseLocator(By.CSS_SELECTOR, "mat-slide-toggle", "toggle")
 
 
+@autoname
 class ObjectPageLocators:
     """Common locators for object's detailed page"""
 
-    title = BaseLocator(By.CSS_SELECTOR, "mat-card-header mat-card-title", "Title")
-    subtitle = BaseLocator(By.CSS_SELECTOR, "mat-card-header mat-card-subtitle", "Subtitle")
-    text = BaseLocator(By.CSS_SELECTOR, "mat-card-content", "Cluster main page text")
+    title = Locator(By.CSS_SELECTOR, "mat-card-header mat-card-title", Descriptor.TEXT)
+    subtitle = Locator(By.CSS_SELECTOR, "mat-card-header mat-card-subtitle", Descriptor.TEXT)
+    text = Locator(By.CSS_SELECTOR, "mat-card-content", Descriptor.TEXT)
 
 
 class ObjectPageMenuLocators:
@@ -53,15 +54,3 @@ class ObjectPageMenuLocators:
     policies_tab = BaseLocator(By.CSS_SELECTOR, "a[adcm_test='tab_policies']", "Tab admin policies")
     operations_tab = BaseLocator(By.CSS_SELECTOR, "a[adcm_test='tab_audit/operations']", "Tab admin audit operations")
     warn_icon = BaseLocator(By.CSS_SELECTOR, "mat-icon[color='warn']", 'Icon "!"')
-
-
-class CommonActionLocators:
-    """Common action page elements locators"""
-
-    action_card = BaseLocator(By.CSS_SELECTOR, "app-action-card", "Action card")
-    info_text = BaseLocator(By.CSS_SELECTOR, "app-action-card>p", "Text on action page")
-
-    class ActionCard:
-        """Common action page action card elements locators"""
-
-        play_btn = BaseLocator(By.CSS_SELECTOR, "button", "Action run button")

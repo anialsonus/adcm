@@ -42,7 +42,7 @@ class ClusterListPage(BasePageObject):  # pylint: disable=too-many-public-method
     def __init__(self, driver, base_url):
         super().__init__(driver, base_url, "/cluster")
         self.config = CommonConfigMenuObj(self.driver, self.base_url)
-        self.table = CommonTableObj(self.driver, self.base_url, ClusterListLocators.ClusterTable)
+        self.table = CommonTableObj(driver=self.driver, locators_class=ClusterListLocators.ClusterTable)
         self.host_popup = HostCreatePopupObj(self.driver, self.base_url)
 
     @allure.step("Create cluster")
@@ -166,9 +166,7 @@ class ClusterListPage(BasePageObject):  # pylint: disable=too-many-public-method
     def open_rename_cluster_dialog(self, row: WebElement) -> RenameDialog:
         self.hover_element(row)
         self.find_child(row, self.table.locators.ClusterRow.rename_btn).click()
-        dialog = RenameDialog(driver=self.driver, base_url=self.base_url)
-        dialog.wait_opened()
-        return dialog
+        return RenameDialog.wait_opened(driver=self.driver)
 
     @allure.step("Run upgrade {upgrade_name} for cluster from row")
     def run_upgrade_in_cluster_row(

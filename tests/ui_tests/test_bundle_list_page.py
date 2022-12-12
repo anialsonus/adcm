@@ -28,6 +28,7 @@ from tests.ui_tests.app.page.bundle.page import BundlePage
 from tests.ui_tests.app.page.bundle_list.page import BundleInfo, BundleListPage
 from tests.ui_tests.app.page.cluster_list.page import ClusterListPage
 from tests.ui_tests.app.page.host_list.page import HostListPage
+from tests.ui_tests.core.checks import check_pagination
 
 LICENSE_FP = os.path.join(utils.get_data_dir(__file__), 'license.txt')
 
@@ -270,6 +271,5 @@ def test_upload_cluster_bundle_from_another_page(
 @pytest.mark.usefixtures("upload_bundles")
 def test_bundle_list_pagination(page: BundleListPage):
     """Upload 12 bundles and check pagination"""
-    params = {'on_first_page': 10, 'on_second_page': 2}
     page.close_info_popup()
-    page.table.check_pagination(params['on_second_page'])
+    check_pagination(page.table, expected_on_second=2)

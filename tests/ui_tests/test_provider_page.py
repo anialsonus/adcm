@@ -29,6 +29,7 @@ from tests.ui_tests.app.page.provider.page import (
     ProviderMainPage,
 )
 from tests.ui_tests.app.page.provider_list.page import ProviderListPage
+from tests.ui_tests.core.checks import check_pagination
 from tests.ui_tests.utils import create_few_groups
 
 # pylint: disable=redefined-outer-name
@@ -135,7 +136,7 @@ class TestProviderListPage:
                 bundle.provider_create(name=f"Test provider {i}")
         provider_page = ProviderListPage(app_fs.driver, app_fs.adcm.url).open()
         provider_page.close_info_popup()
-        provider_page.table.check_pagination(second_page_item_amount=1)
+        check_pagination(provider_page.table, expected_on_second=1)
 
     @pytest.mark.smoke()
     @pytest.mark.include_firefox()
@@ -429,4 +430,4 @@ class TestProviderGroupConfigPage:
             app_fs.driver, app_fs.adcm.url, upload_and_create_test_provider.id
         ).open()
         create_few_groups(group_conf_page.group_config)
-        group_conf_page.table.check_pagination(second_page_item_amount=1)
+        check_pagination(group_conf_page.table, expected_on_second=1)

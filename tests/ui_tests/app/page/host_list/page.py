@@ -49,7 +49,7 @@ class HostListPage(BasePageObject):  # pylint: disable=too-many-public-methods
 
     def __init__(self, driver, base_url):
         super().__init__(driver, base_url, "/host")
-        self.table = CommonTableObj(self.driver, self.base_url, HostListLocators.HostTable)
+        self.table = CommonTableObj(driver=self.driver, locators_class=HostListLocators.HostTable)
         self.host_popup = HostCreatePopupObj(self.driver, self.base_url)
 
     @allure.step('Get host information from row #{row_num}')
@@ -265,9 +265,7 @@ class HostListPage(BasePageObject):  # pylint: disable=too-many-public-methods
     def open_rename_dialog(self, row: WebElement) -> RenameDialog:
         self.hover_element(row)
         self.find_child(row, self.table.locators.HostRow.rename_btn).click()
-        dialog = RenameDialog(driver=self.driver, base_url=self.base_url)
-        dialog.wait_opened()
-        return dialog
+        return RenameDialog.wait_opened(driver=self.driver)
 
     def _insert_new_host_info(self, fqdn: str, cluster: Optional[str] = None):
         """Insert new host info in fields of opened popup"""

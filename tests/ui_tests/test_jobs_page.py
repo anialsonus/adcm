@@ -38,6 +38,7 @@ from tests.ui_tests.app.page.cluster_list.page import ClusterListPage
 from tests.ui_tests.app.page.job.page import JobPageStdout
 from tests.ui_tests.app.page.job_list.page import JobListPage, JobStatus
 from tests.ui_tests.app.page.login.page import LoginPage
+from tests.ui_tests.core.checks import check_pagination
 from tests.ui_tests.utils import (
     is_empty,
     is_not_empty,
@@ -215,7 +216,7 @@ class TestTaskPage:
         with allure.step('Check pagination'):
             with page.table.wait_rows_change():
                 page.select_filter_all_tab()
-            page.table.check_pagination(params['second_page'])
+            check_pagination(page.table, expected_on_second=params['second_page'])
 
     @pytest.mark.smoke()
     @pytest.mark.include_firefox()

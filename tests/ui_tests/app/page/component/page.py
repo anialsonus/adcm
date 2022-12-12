@@ -63,7 +63,7 @@ class ComponentPageMixin(BasePageObject):
         self.component_id = component_id
         self.config = CommonConfigMenuObj(self.driver, self.base_url)
         self.toolbar = CommonToolbar(self.driver, self.base_url)
-        self.table = CommonTableObj(self.driver, self.base_url)
+        self.table = CommonTableObj(driver=self.driver)
         self.group_config = GroupConfigList(self.driver, self.base_url)
 
     @allure.step("Open Main tab by menu click")

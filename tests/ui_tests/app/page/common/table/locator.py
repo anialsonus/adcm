@@ -19,7 +19,6 @@ from tests.ui_tests.core.locators import BaseLocator, TemplateLocator
 class CommonTable:
     """Common table locators (eg, cluster list page table)."""
 
-    visible_row = BaseLocator(By.CSS_SELECTOR, "mat-row[adwphover]", "Visible table row")
     header = BaseLocator(By.CSS_SELECTOR, "mat-header-cell>div", "Table header")
     row = BaseLocator(By.CSS_SELECTOR, "mat-row[adwphover]", "Table row")
     backdrop = BaseLocator(By.CSS_SELECTOR, ".cdk-overlay-backdrop", "backdrop")

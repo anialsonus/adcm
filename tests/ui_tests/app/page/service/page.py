@@ -69,7 +69,7 @@ class ServicePageMixin(BasePageObject):  # pylint: disable=too-many-instance-att
         self.cluster_id = cluster_id
         self.service_id = service_id
         self.toolbar = CommonToolbar(self.driver, self.base_url)
-        self.table = CommonTableObj(self.driver, self.base_url)
+        self.table = CommonTableObj(driver=self.driver)
         self.group_config = GroupConfigList(self.driver, self.base_url)
 
     @allure.step("Open Main tab by menu click")

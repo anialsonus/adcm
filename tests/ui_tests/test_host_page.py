@@ -42,7 +42,11 @@ from tests.ui_tests.app.page.host.page import (
 )
 from tests.ui_tests.app.page.host_list.locators import HostListLocators
 from tests.ui_tests.app.page.host_list.page import HostListPage
-from tests.ui_tests.core.checks import check_element_is_hidden, check_element_is_visible
+from tests.ui_tests.core.checks import (
+    check_element_is_hidden,
+    check_element_is_visible,
+    check_pagination,
+)
 from tests.ui_tests.utils import expect_rows_amount_change, wait_and_assert_ui_info
 
 # defaults
@@ -128,7 +132,7 @@ def upload_and_create_cluster(cluster_bundle: Bundle) -> Tuple[Bundle, Cluster]:
 @allure.title("Open /host page")
 def page(app_fs: ADCMTest, _login_to_adcm_over_api) -> HostListPage:
     """Open host page"""
-    return HostListPage(app_fs.driver, app_fs.adcm.url).open()
+    return HostListPage(app_fs.driver, app_fs.adcm.url).open(close_popup=True)
 
 
 @allure.step('Open host config menu from host list')
@@ -231,9 +235,7 @@ class TestHostListPage:
     def test_host_list_pagination(self, page: HostListPage):
         """Create more than 10 hosts and check pagination"""
 
-        hosts_on_second_page = 2
-        page.close_info_popup()
-        page.table.check_pagination(hosts_on_second_page)
+        check_pagination(page.table, expected_on_second=2)
 
     @pytest.mark.smoke()
     @pytest.mark.include_firefox()
@@ -633,8 +635,8 @@ class TestHostRenaming:
         new_name = "best-host.fqdn"
 
         dialog = page.open_rename_dialog(page.get_host_row())
-        dialog.set_new_name_in_rename_dialog(new_name)
-        dialog.click_save_on_rename_dialog()
+        dialog.set_new_name(new_name)
+        dialog.save()
         with allure.step("Check fqdn of host in table"):
             name_in_row = page.get_host_info_from_row(0).fqdn
             assert name_in_row == new_name, f"Incorrect cluster name, expected: {new_name}"
@@ -652,14 +654,12 @@ class TestHostRenaming:
 
         for fqdn in incorrect_names:
             with allure.step(f"Check if printing host FQDN '{fqdn}' triggers a warning message"):
-                dialog.set_new_name_in_rename_dialog(dummy_name)
-                dialog.set_new_name_in_rename_dialog(fqdn)
-                assert dialog.is_dialog_error_message_visible(), "Error about incorrect name should be visible"
-                assert (
-                    dialog.get_dialog_error_message() == self.EXPECTED_ERROR
-                ), f"Incorrect error message, expected: {self.EXPECTED_ERROR}"
+                dialog.set_new_name(dummy_name)
+                dialog.set_new_name(fqdn)
+                assert dialog.is_error_message_visible(), "Error about incorrect name should be visible"
+                assert dialog.error == self.EXPECTED_ERROR, f"Incorrect error message, expected: {self.EXPECTED_ERROR}"
 
-        dialog.click_cancel_on_rename_dialog()
+        dialog.cancel()
 
     def _test_an_error_is_not_shown_on_correct_char_in_name(self, page: HostListPage) -> None:
         dummy_name = "clUster"
@@ -673,10 +673,10 @@ class TestHostRenaming:
 
         for fqdn in correct_names:
             with allure.step(f"Check if printing host FQDN '{fqdn}' shows no error"):
-                dialog.set_new_name_in_rename_dialog(dummy_name)
-                dialog.set_new_name_in_rename_dialog(fqdn)
-                assert not dialog.is_dialog_error_message_visible(), "Error about correct name should not be shown"
-                dialog.click_save_on_rename_dialog()
+                dialog.set_new_name(dummy_name)
+                dialog.set_new_name(fqdn)
+                assert not dialog.is_error_message_visible(), "Error about correct name should not be shown"
+                dialog.save()
                 name_in_row = page.get_host_info_from_row().fqdn
                 assert name_in_row == fqdn, f"Incorrect host FQDN, expected: {fqdn}"
                 dialog = page.open_rename_dialog(page.get_host_row())

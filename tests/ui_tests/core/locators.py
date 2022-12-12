@@ -8,6 +8,7 @@ class Descriptor(Flag):
     ELEMENT = auto()
     TEXT = auto()
     BUTTON = auto()
+    INPUT = auto()
 
 
 @dataclass()

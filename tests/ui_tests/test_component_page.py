@@ -38,6 +38,7 @@ from tests.ui_tests.app.page.component.page import (
 )
 from tests.ui_tests.app.page.host.page import HostStatusPage
 from tests.ui_tests.app.page.service.page import ServiceComponentPage
+from tests.ui_tests.core.checks import check_pagination
 from tests.ui_tests.utils import create_few_groups
 
 BUNDLE_COMMUNITY = "cluster_community"
@@ -364,7 +365,7 @@ class TestComponentGroupConfigPage:
             app_fs.driver, app_fs.adcm.url, cluster.id, service.id, component.id
         ).open()
         create_few_groups(group_conf_page.group_config)
-        group_conf_page.table.check_pagination(second_page_item_amount=1)
+        check_pagination(group_conf_page.table, expected_on_second=1)
 
 
 @pytest.mark.parametrize("bundle_archive", [utils.get_data_dir(__file__, BUNDLE_COMMUNITY)], indirect=True)

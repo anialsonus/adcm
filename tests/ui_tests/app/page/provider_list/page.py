@@ -43,7 +43,7 @@ class ProviderListPage(BasePageObject):
     def __init__(self, driver, base_url):
         super().__init__(driver, base_url, "/provider")
         self.toolbar = CommonToolbar(self.driver, self.base_url)
-        self.table = CommonTableObj(self.driver, self.base_url, HostListLocators.HostTable)
+        self.table = CommonTableObj(driver=self.driver, locators_class=HostListLocators.HostTable)
         self.host_popup = HostCreatePopupObj(self.driver, self.base_url)
 
     @allure.step("Create provider")

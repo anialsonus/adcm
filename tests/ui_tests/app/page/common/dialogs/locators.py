@@ -22,13 +22,6 @@ class Dialog:
     body = BaseLocator(By.CSS_SELECTOR, "mat-dialog-container", "Dialog with choices")
 
 
-class RenameDialogLocators(Dialog):
-    object_name = BaseLocator(By.TAG_NAME, "input", "Object name to set")
-    error = BaseLocator(By.TAG_NAME, "mat-error", "Error message")
-    save = BaseLocator(By.XPATH, "//button//span[contains(text(), 'Save')]", "Save button in rename dialog")
-    cancel = BaseLocator(By.XPATH, "//button//span[contains(text(), 'Cancel')]", "Cancel button in rename dialog")
-
-
 class DeleteDialog(Dialog):
     yes = BaseLocator(By.XPATH, "//button//span[contains(text(), 'Yes')]", "Yes button in delete dialog")
 
