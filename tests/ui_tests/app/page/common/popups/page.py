@@ -17,10 +17,10 @@ from typing import Optional
 import allure
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait as WDW
-from tests.ui_tests.app.helpers.locator import BaseLocator
 from tests.ui_tests.app.page.common.base_page import BasePageObject
 from tests.ui_tests.app.page.common.popups.locator import HostCreationLocators
 from tests.ui_tests.core.checks import check_element_is_visible
+from tests.ui_tests.core.locators import BaseLocator
 
 
 class HostCreatePopupObj(BasePageObject):

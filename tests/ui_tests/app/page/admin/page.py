@@ -19,7 +19,6 @@ import allure
 from adcm_pytest_plugin.utils import wait_until_step_succeeds
 from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 from selenium.webdriver.remote.webelement import WebElement
-from tests.ui_tests.app.helpers.locator import BaseLocator
 from tests.ui_tests.app.page.admin.locators import (
     AdminGroupsLocators,
     AdminIntroLocators,
@@ -46,6 +45,7 @@ from tests.ui_tests.core.checks import (
     check_element_is_visible,
     check_elements_are_displayed,
 )
+from tests.ui_tests.core.locators import BaseLocator
 
 # pylint: disable=too-many-lines
 

@@ -3,13 +3,21 @@ from enum import Flag, auto
 from operator import methodcaller
 from typing import Type
 
-from tests.ui_tests.app.helpers.locator import BaseLocator
-
 
 class Descriptor(Flag):
     ELEMENT = auto()
     TEXT = auto()
     BUTTON = auto()
+
+
+@dataclass()
+class BaseLocator:
+    by: str
+    value: str
+    name: str
+
+    def __repr__(self):
+        return self.name
 
 
 class Locator(BaseLocator):

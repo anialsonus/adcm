@@ -13,7 +13,7 @@
 """Group Configuration list page locators"""
 
 from selenium.webdriver.common.by import By
-from tests.ui_tests.app.helpers.locator import BaseLocator
+from tests.ui_tests.core.locators import BaseLocator
 
 
 class GroupConfigListLocators:

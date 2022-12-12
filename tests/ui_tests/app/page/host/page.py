@@ -16,7 +16,6 @@ from typing import Optional
 
 import allure
 from adcm_pytest_plugin.utils import wait_until_step_succeeds
-from tests.ui_tests.app.helpers.locator import BaseLocator
 from tests.ui_tests.app.page.common.base_page import BaseDetailedPage, BasePageObject
 from tests.ui_tests.app.page.common.common_locators import ObjectPageLocators
 from tests.ui_tests.app.page.common.configuration.locators import CommonConfigMenu
@@ -25,6 +24,7 @@ from tests.ui_tests.app.page.common.status.page import StatusPage
 from tests.ui_tests.app.page.common.tooltip_links.page import CommonToolbar
 from tests.ui_tests.app.page.host.locators import HostLocators
 from tests.ui_tests.core.checks import check_elements_are_displayed
+from tests.ui_tests.core.locators import BaseLocator
 
 
 class HostPageMixin(BasePageObject):

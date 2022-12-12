@@ -28,7 +28,6 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait as WDW
-from tests.ui_tests.app.helpers.locator import BaseLocator
 from tests.ui_tests.app.page.common.common_locators import (
     CommonLocators,
     ObjectPageLocators,
@@ -42,6 +41,7 @@ from tests.ui_tests.app.page.common.popups.locator import CommonPopupLocators
 from tests.ui_tests.app.page.common.tooltip_links.locator import CommonToolbarLocators
 from tests.ui_tests.core.checks import check_elements_are_displayed
 from tests.ui_tests.core.interactors import Interactor
+from tests.ui_tests.core.locators import BaseLocator
 from tests.ui_tests.utils import assert_enough_rows
 
 

@@ -1,6 +1,6 @@
 from selenium.common import TimeoutException
 from selenium.webdriver.remote.webelement import WebElement
-from tests.ui_tests.app.helpers.locator import BaseLocator
+from tests.ui_tests.core.locators import BaseLocator
 
 
 def check_elements_are_displayed(page, locators: list[BaseLocator]) -> None:
