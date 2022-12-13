@@ -51,13 +51,34 @@ export abstract class ListDirective extends BaseDirective implements OnInit, OnD
   addToSorting = false;
 
   @Input()
-  set dataSource(data: { results: any; count: number }) {
+  set dataSource(data: { results: any; count: number; previous: any }) {
     if (data) {
       const list = data.results;
+      const isListBlank = list.length === 0;
+      const hasPreviousPage = data.previous !== null;
       this.data = new MatTableDataSource<any>(list);
       this.changeCount(data.count);
       if (Array.isArray(list)) {
         this.listItemEvt.emit({ cmd: 'onLoad', row: list[0] });
+      }
+
+      if (hasPreviousPage && isListBlank) {
+        const url = this.router.url;
+        const urlHasSubdomain = url.includes('admin');
+        const path = this.route.snapshot.routeConfig.path;
+
+        const urlParams = {
+          page: this.getPageIndex() < 1 ? '0' : String(this.getPageIndex() - 1),
+          limit: this.getPageSize(),
+          filter: this.baseListDirective.listParams.get("filter"),
+          ordering: this.getSortParam(this.getSort()),
+        }
+
+        if (urlHasSubdomain) {
+          this.router.navigate(['./admin', path, urlParams]);
+        } else {
+          this.router.navigate(['./', urlParams]);
+        }
       }
     }
   }
