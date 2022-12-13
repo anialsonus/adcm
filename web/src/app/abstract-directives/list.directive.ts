@@ -70,7 +70,7 @@ export abstract class ListDirective extends BaseDirective implements OnInit, OnD
         const urlParams = {
           page: this.getPageIndex() < 1 ? '0' : String(this.getPageIndex() - 1),
           limit: this.getPageSize(),
-          filter: this.baseListDirective.listParams.get("filter"),
+          filter: this.baseListDirective.listParams.get('filter'),
           ordering: this.getSortParam(this.getSort()),
         }
 
