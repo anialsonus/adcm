@@ -236,9 +236,11 @@ class BundleDefinition:
             raise NotImplementedError
 
     def save(self) -> None:
-        # TODO: link all to Bundle
-        self._validate()
+        # TODO: link all to BundleData
         self._save_to_db()
+
+    def validate(self):
+        self._validate()
 
     def _validate(self):
         # TODO: rework commented
@@ -412,21 +414,26 @@ class BundleDefinition:
             action_name = re.sub(r"\s+", "_", action_name).strip().lower()
             action_name = re.sub(r"\(|\)", "", action_name)
 
-            upgrade_action = self._make_action(prototype=prototype, action=config_, action_name=action_name)
-            definition_data.actions.append(upgrade_action)
+            self._make_action(
+                prototype=prototype, action=config_, action_name=action_name, definition_data=definition_data
+            )
 
         if config_.get("actions") is None:
             return None
 
         for action_name in sorted(config_["actions"]):
-            action = self._make_action(
-                prototype=prototype, action=config_["actions"][action_name], action_name=action_name
+            self._make_action(
+                prototype=prototype,
+                action=config_["actions"][action_name],
+                action_name=action_name,
+                definition_data=definition_data,
             )
-            definition_data.actions.append(action)
 
         return None
 
-    def _make_action(self, prototype: PrototypeData, action: dict, action_name: str) -> ActionData:
+    def _make_action(
+        self, prototype: PrototypeData, action: dict, action_name: str, definition_data: DefinitionData
+    ) -> None:
         # pylint: disable=too-many-branches,too-many-statements
         cm.stack.validate_name(action_name, f"Action name \"{action_name}\" of {prototype.ref}")
         action_data = ActionData(prototype=prototype, name=action_name, type=action["type"])
@@ -493,10 +500,10 @@ class BundleDefinition:
             action_data.multi_state_on_fail_set = []
             action_data.multi_state_on_fail_unset = []
 
-        # TODO: cm.stack.save_sub_actions
+        self._make_sub_actions(action=action, action_data=action_data, definition_data=definition_data)
         # TODO: cm.stack.save_prototype_config
 
-        return action_data
+        definition_data.actions.append(action_data)
 
     @staticmethod
     def _get_fixed_action_hc_acl(prototype: PrototypeData, action: dict) -> List[dict]:
@@ -509,6 +516,35 @@ class BundleDefinition:
                     action["hc_acl"][idx]["service"] = prototype.name
 
         return hostcomponentmap
+
+    def _make_sub_actions(self, action: dict, action_data: ActionData, definition_data: DefinitionData):
+        if action_data.type != "task":
+            return
+
+        for sub in action["scripts"]:
+            subaction_data = SubActionData(
+                action=action_data, name=sub["name"], script=sub["script"], script_type=sub["script_type"]
+            )
+
+            subaction_data.display_name = sub["name"]
+            if "display_name" in sub:
+                subaction_data.display_name = sub["display_name"]
+            if sub.get("params") is not None:
+                subaction_data.params = sub["params"]
+            if sub.get("allow_to_terminate") is not None:
+                subaction_data.allow_to_terminate = sub["allow_to_terminate"]
+
+            on_fail = sub.get(ON_FAIL, "")
+            if isinstance(on_fail, str):
+                subaction_data.state_on_fail = on_fail
+                subaction_data.multi_state_on_fail_set = []
+                subaction_data.multi_state_on_fail_unset = []
+            elif isinstance(on_fail, dict):
+                subaction_data.state_on_fail = _deep_get(on_fail, STATE, default="")
+                subaction_data.multi_state_on_fail_set = _deep_get(on_fail, MULTI_STATE, SET, default=[])
+                subaction_data.multi_state_on_fail_unset = _deep_get(on_fail, MULTI_STATE, UNSET, default=[])
+
+            definition_data.sub_actions.append(subaction_data)
 
 
 STAGE = (  # TODO: remove
@@ -541,6 +577,7 @@ def load_bundle(bundle_file) -> Bundle:
             bundle_def.add_definition(definition)
             # cm.stack.save_definition_to_stage(bundle_hash=bundle_hash, **definition.__dict__)
 
+        bundle_def.validate()
         bundle_def.save()
 
         process_bundle(path, bundle_hash)  # TODO: remove
