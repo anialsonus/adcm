@@ -74,10 +74,11 @@ export abstract class ListDirective extends BaseDirective implements OnInit, OnD
           ordering: this.getSortParam(this.getSort()),
         }
 
-        if (urlHasSubdomain) {
+        if (urlHasSubdomain && path) {
           this.router.navigate(['./admin', path, urlParams]);
         } else {
-          this.router.navigate(['./', urlParams]);
+          localStorage.removeItem('list:param');
+          history.back();
         }
       }
     }
@@ -221,5 +222,4 @@ export abstract class ListDirective extends BaseDirective implements OnInit, OnD
   gotoStatus(data: StatusData<ICluster>): void {
     this.clickCell(data.event, data.action, data.row);
   }
-
 }
