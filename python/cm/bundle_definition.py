@@ -13,12 +13,11 @@
 import hashlib
 import re
 from copy import deepcopy
-from dataclasses import dataclass, field
-from datetime import datetime as dt
 from pathlib import Path
-from typing import List
+from typing import Any
 
 from django.conf import settings
+from pydantic import BaseModel, Json  # pylint: disable=no-name-in-module
 
 from cm.errors import AdcmEx
 from cm.logger import logger
@@ -42,233 +41,127 @@ from cm.stack import (
 # pylint: disable=too-many-instance-attributes
 
 
-@dataclass
-class Definition:
-    """Definition from .yaml file"""
+DEFAULT_CONSTRAINT = [0, "+"]
 
+
+class DefinitionFile(BaseModel):
     path: str
-    fname: str
-    conf: dict
-    adcm_: bool = False
-    obj_list: dict = field(default_factory=dict)
+    filename: str
+    config: dict | list[dict]
+    bundle_hash: str
 
 
-@dataclass
-class DefinitionData:
-    """Definition divided into entities (lists od dataclasses)"""
+class DefinitionData(BaseModel):
+    """Single definition divided into entities (list of python entities)"""
 
-    prototypes: list = field(default_factory=list)
-    actions: list = field(default_factory=list)
-    sub_actions: list = field(default_factory=list)
-    prototype_configs: list = field(default_factory=list)
-    upgrades: list = field(default_factory=list)
-    prototype_exports: list = field(default_factory=list)
-    prototype_imports: list = field(default_factory=list)
-
-
-@dataclass
-class BundleData:
-    name: str
-    version: str
-    hash: str
-    version_order: int = 0
-    edition: str = "community"
-    description: str = ""
-    date: str = str(dt.utcnow())
-    category: int | None = None
+    definition_file: DefinitionFile
+    prototypes: list = []
+    actions: list = []
+    sub_actions: list = []
+    prototype_configs: list = []
+    upgrades: list = []
+    prototype_exports: list = []
+    prototype_imports: list = []
 
 
-@dataclass
-class PrototypeData:
+class BaseData(BaseModel):
+    _none_allowed_fields = ()
+    _to_db_fields = set()
+
+    def _get_db_dict(self) -> dict:
+        return self.dict(include=self._to_db_fields)
+
+    @classmethod
+    def _dict_get(cls, source: dict, key: str) -> tuple[Any, bool]:
+        """returns (<value>, <is_legit_value>)"""
+        if key in source:
+            if source.get(key, None) is None:
+                if key in cls._none_allowed_fields:
+                    return None, True
+                else:
+                    return None, False
+
+            return source[key], True
+
+        return None, False
+
+    @staticmethod
+    def _get_display_name(source: dict, prototype: "PrototypeData"):
+        if "display_name" in source:
+            return source["display_name"]
+
+        return prototype.name
+
+
+class PrototypeData(BaseData):
     type: str
+    parent: "PrototypeData" = None
     name: str
-    version: str
-    parent = None  # TODO: type None | self (typing.Self)
-    bundle: BundleData | None = None
     path: str = ""
+    display_name: str = ""
+    version: str
+    edition: str = "community"
     license: str = "absent"
     license_path: str | None = None
     license_hash: str | None = None
-    display_name: str = ""
-    version_order: int = 0
     required: bool = False
     shared: bool = False
-    constraint: str = '[0, "+"]'
-    requires: str = "[]"
-    bound_to: str = "{}"
+    constraint: Json[list[str | int]] = DEFAULT_CONSTRAINT
+    requires: Json[list] = []
+    bound_to: Json[dict] = {}
     adcm_min_version: str | None = None
-    monitoring: str = "active"
     description: str = ""
+    monitoring: str = "active"
     config_group_customization: bool = False
     venv: str = "default"
     allow_maintenance_mode: bool = False
-    edition: str = "community"
 
     @property
     def ref(self):
         return f"{self.type} \"{self.name}\" {self.version}"
 
-
-@dataclass
-class ActionData:
-    prototype: PrototypeData
-    name: str
-    type: str
-    script: str | None = None
-    script_type: str | None = None
-    display_name: str = ""
-    description: str = ""
-    ui_options: str = "{}"
-    state_available: str = "[]"
-    state_unavailable: str = "[]"
-    state_on_success: str = ""
-    state_on_fail: str = ""
-    multi_state_available: str = "any"
-    multi_state_unavailable: str = "[]"
-    multi_state_on_success_set: str = "[]"
-    multi_state_on_success_unset: str = "[]"
-    multi_state_on_fail_set: str = "[]"
-    multi_state_on_fail_unset: str = "[]"
-    params: str = "{}"
-    log_files: str = "[]"
-    hostcomponentmap: str = "[]"
-    allow_to_terminate: bool = False
-    partial_execution: bool = False
-    host_action: bool = False
-    allow_in_maintenance_mode: bool = False
-    venv: str = "default"
-
-
-@dataclass
-class SubActionData:
-    action: ActionData
-    name: str
-    script: str
-    script_type: str
-    display_name: str = ""
-    state_on_fail: str = ""
-    multi_state_on_fail_set: str = "[]"
-    multi_state_on_fail_unset: str = "[]"
-    params: str = "{}"
-    allow_to_terminate: bool | None = None
-
-
-@dataclass
-class UpgradeData:
-    min_version: str
-    max_version: str
-    name: str = ""
-    description: str = ""
-    min_strict: bool = False
-    max_strict: bool = False
-    from_edition: str = "[\"community\"]"
-    state_available: str = "[]"
-    state_on_success: str = ""
-    action: ActionData | None = None
-
-
-class BundleDefinition:
-    """
-    Class for saving whole bundle definition in python's structures
-    to perform validations and save bundle to db if validations was successful
-    """
-
-    def __init__(self, bundle_hash: str):
-        self._bundle_hash = bundle_hash
-
-        # analog of second_pass() on `stage` tables TODO: перенести сюда
-        self._validate_funcs = (self._validate_actions, self._validate_components, self._validate_config)
-
-        # analogue of `stage` tables
-        self._definitions = []
-        # self.prototypes = []
-        # self.actions = []
-        # self.prototype_configs = []
-        # self.upgrades = []
-        # self.prototype_exports = []
-        # self.prototype_imports = []
-
-    def add_definition(self, definition: Definition) -> None:
-        """split objects' definitions into prototypes"""
-
-        if isinstance(definition.conf, dict):
-            check_object_definition(definition.fname, definition.conf, definition.conf["type"], definition.obj_list)
-            self._add_prototype(definition.conf, definition)
-
-        elif isinstance(definition.conf, list):
-            for obj_def in definition.conf:
-                check_object_definition(definition.fname, obj_def, obj_def["type"], definition.obj_list)
-                self._add_prototype(obj_def, definition)
-
-        else:
-            raise NotImplementedError
-
-    def save(self) -> None:
-        # TODO: link all to BundleData
-        self._save_to_db()
-
-    def validate(self):
-        self._validate()
-
-    def _validate(self):
-        # TODO: rework commented
-        # if not any(
-        #     (
-        #         self.prototypes,
-        #         self.actions,
-        #         self.prototype_configs,
-        #         self.upgrades,
-        #         self.prototype_exports,
-        #         self.prototype_imports,
-        #     )
-        # ):
-        #     raise RuntimeError("Add some definitions via `add_definition()` first")
-
-        for validate_func in self._validate_funcs:
-            validate_func()
-
-    def _save_to_db(self):
-        pass
-
-    def _validate_actions(self):
-        pass
-
-    def _validate_components(self):
-        pass
-
-    def _validate_config(self):
-        pass
-
-    # TODO: validate whole definition. new containers for not validated yet???
-    def _add_prototype(self, conf: dict, definition: Definition) -> None:
-        # proto_index = len(self.prototypes)
-        definition_data = DefinitionData()
-
-        prototype = PrototypeData(name=conf["name"], type=conf["type"], path=definition.path, version=conf["version"])
-
-        if conf.get("required") is not None:
-            prototype.required = conf["required"]
-        if conf.get("shared") is not None:
-            prototype.shared = conf["shared"]
-        if conf.get("monitoring") is not None:
-            prototype.monitoring = conf["monitoring"]
-        if conf.get("description") is not None:
-            prototype.description = conf["description"]
-        if conf.get("adcm_min_version") is not None:
-            prototype.adcm_min_version = conf["adcm_min_version"]
-        if conf.get("venv") is not None:
-            prototype.venv = conf["venv"]
-        if conf.get("edition") is not None:
-            prototype.edition = conf["edition"]
-        if conf.get("allow_maintenance_mode") is not None:
-            prototype.allow_maintenance_mode = conf["allow_maintenance_mode"]
-
-        prototype.display_name = self._get_display_name(conf, prototype)
-        prototype.config_group_customization = self._get_config_group_customization(
-            conf=conf, proto=prototype, definition_data=definition_data
+    @classmethod
+    def make(cls, source: dict, definition_data: DefinitionData) -> "PrototypeData":
+        prototype = cls(
+            name=source["name"],
+            type=source["type"],
+            path=definition_data.definition_file.path,
+            version=source["version"],
         )
 
-        if license_hash := self._get_license_hash(conf, prototype, definition) != "absent" and prototype.type not in [
+        value, legit = cls._dict_get(source=source, key="required")
+        if legit:
+            prototype.required = value
+        value, legit = cls._dict_get(source=source, key="shared")
+        if legit:
+            prototype.shared = value
+        value, legit = cls._dict_get(source=source, key="monitoring")
+        if legit:
+            prototype.monitoring = value
+        value, legit = cls._dict_get(source=source, key="description")
+        if legit:
+            prototype.description = value
+        value, legit = cls._dict_get(source=source, key="adcm_min_version")
+        if legit:
+            prototype.adcm_min_version = value
+        value, legit = cls._dict_get(source=source, key="venv")
+        if legit:
+            prototype.venv = value
+        value, legit = cls._dict_get(source=source, key="edition")
+        if legit:
+            prototype.edition = value
+        value, legit = cls._dict_get(source=source, key="allow_maintenance_mode")
+        if legit:
+            prototype.allow_maintenance_mode = value
+
+        prototype.display_name = cls._get_display_name(source=source, prototype=prototype)
+        prototype.config_group_customization = cls.get_config_group_customization(
+            source=source, prototype=prototype, definition_data=definition_data
+        )
+
+        if license_hash := cls.get_license_hash(
+            source=source, prototype=prototype, definition_file=definition_data.definition_file
+        ) != "absent" and prototype.type not in [
             "cluster",
             "service",
             "provider",
@@ -277,38 +170,51 @@ class BundleDefinition:
                 "INVALID_OBJECT_DEFINITION",
                 f"Invalid license definition in {prototype.ref}. License can be placed in cluster, service or provider",
             )
-        if conf.get("license") and license_hash != "absent":
-            prototype.license_path = conf["license"]
+
+        value, legit = cls._dict_get(source=source, key="license")
+        if legit and license_hash != "absent":
+            prototype.license_path = source["license"]
             prototype.license_hash = license_hash
 
-        definition_data.prototypes.append(prototype)
-        self._save_actions(definition_data=definition_data, prototype=prototype, config=conf, upgrade=None)  # TODO
-
-        # TODO: save_actions
-        # TODO: save_upgrade
-        # TODO: save_components
-        # TODO: save_prototype_config
-        # TODO: save_export
-        # TODO: save_import
-
-        self._definitions.append(definition_data)
+        return prototype
 
     @staticmethod
-    def _get_display_name(conf: dict, prototype: PrototypeData) -> str:
-        if "display_name" in conf:
-            return conf["display_name"]
+    def get_config_group_customization(
+        source: dict, prototype: "PrototypeData", definition_data: DefinitionData
+    ) -> bool:
+        if not source:
+            return False
 
-        return prototype.name
+        if "config_group_customization" not in source:
+            cluster_prototype = None
 
-    def _get_license_hash(self, conf: dict, prototype: PrototypeData, definition: Definition) -> str:
-        if "license" not in conf:
+            if prototype.type == "service":
+                cluster_prototype = [i for i in definition_data.prototypes + [prototype] if i.type == "cluster"]
+                if len(cluster_prototype) < 1:
+                    logger.debug("Can't find cluster for service %s", prototype.name)
+                elif len(cluster_prototype) > 1:
+                    logger.debug("Found more than one cluster for service %s", prototype.name)
+                else:
+                    cluster_prototype = cluster_prototype[0]
+
+            elif prototype.type == "component":
+                cluster_prototype = prototype.parent
+
+            if cluster_prototype:
+                return cluster_prototype.config_group_customization
+
+        return False
+
+    @staticmethod
+    def get_license_hash(source: dict, prototype: "PrototypeData", definition_file: DefinitionFile) -> str:
+        if "license" not in source:
             return "absent"
 
         else:
-            if conf["license"][0:2] == "./":
-                path = Path(settings.BUNDLE_DIR, self._bundle_hash, prototype.path, conf["license"])
+            if source["license"][0:2] == "./":
+                path = Path(settings.BUNDLE_DIR, definition_file.bundle_hash, prototype.path, source["license"])
             else:
-                path = Path(settings.BUNDLE_DIR, self._bundle_hash, definition.fname)
+                path = Path(settings.BUNDLE_DIR, definition_file.bundle_hash, definition_file.filename)
 
             license_file = None
             try:
@@ -329,45 +235,70 @@ class BundleDefinition:
 
         return "absent"
 
-    def _get_config_group_customization(
-        self, conf: dict, proto: PrototypeData, definition_data: DefinitionData
-    ) -> bool:
-        if not conf:
-            return False
 
-        if "config_group_customization" not in conf:
-            service_proto = None
+class UpgradeData(BaseData):
+    def __getattr__(self, item):  # TODO: remove tmp code
+        return "NOT_DEFINED"
 
-            if proto.type == "service":
-                service_proto = [i for i in definition_data.prototypes + [proto] if i.type == "cluster"]
-                if len(service_proto) < 1:
-                    logger.debug("Can't find cluster for service %s", proto)
-                elif len(service_proto) > 1:
-                    logger.debug("Found more than one cluster for service %s", proto)
-                else:
-                    service_proto = service_proto[0]
 
-            elif proto.type == "component":
-                service_proto = proto.parent
+class ActionData(BaseData):
+    # prototype: PrototypeData
+    prototype_ref: str  # TODO: questionable
 
-            if service_proto:
-                return service_proto.config_group_customization
+    name: str
+    display_name: str = ""
+    description: str = ""
+    ui_options: Json[dict] = {}
 
-        return False
+    type: str
+    script: str | None = None
+    script_type: str | None = None
 
-    def _save_actions(
-        self,
-        definition_data: DefinitionData,
-        prototype: PrototypeData,
-        config: dict,
-        upgrade: UpgradeData | None = None,
-    ):
-        config_ = deepcopy(config)
+    state_available: Json[list] = []
+    state_unavailable: Json[list] = []
+    state_on_success: str = ""
+    state_on_fail: str = ""
 
-        if config_.get("versions") is not None:
-            config_["type"] = "task"
-            upgrade_name = config_["name"]
-            config_["display_name"] = f"Upgrade: {upgrade_name}"
+    multi_state_available: Json[list] = ["any"]
+    multi_state_unavailable: Json[list] = []
+    multi_state_on_success_set: Json[list] = []
+    multi_state_on_success_unset: Json[list] = []
+    multi_state_on_fail_set: Json[list] = []
+    multi_state_on_fail_unset: Json[list] = []
+
+    params: Json[dict] = {}
+    log_files: Json[list] = []
+
+    hostcomponentmap: Json[list] = []
+    allow_to_terminate: bool = False
+    partial_execution: bool = False
+    host_action: bool = False
+    allow_in_maintenance_mode: bool = False
+
+    venv: str = "default"
+
+    @property
+    def ref(self):
+        return f"Action \"{self.name}\" of proto \"{self.prototype_ref}\""
+
+    @staticmethod
+    def _validate(action_data: "ActionData"):
+        if action_data.script is None:
+            raise RuntimeError("Field `script` is required")
+
+        if action_data.script_type is None:
+            raise RuntimeError("Field `script_type` is required")
+
+    @classmethod
+    def make_bulk(
+        cls, source: dict, prototype: PrototypeData, upgrade: UpgradeData | None = None
+    ) -> list[tuple["ActionData", dict | None]]:
+        source = deepcopy(source)
+
+        if source.get("versions") is not None:
+            source["type"] = "task"
+            upgrade_name = source["name"]
+            source["display_name"] = f"Upgrade: {upgrade_name}"
 
             if upgrade is not None:
                 action_name = (
@@ -381,85 +312,92 @@ class BundleDefinition:
 
             action_name = re.sub(r"\s+", "_", action_name).strip().lower()
             action_name = re.sub(r"\(|\)", "", action_name)
+            source["action_name"] = action_name
 
-            self._make_action(
-                prototype=prototype, action=config_, action_name=action_name, definition_data=definition_data
-            )
+            return [(cls._make(source=source, prototype=prototype), source)]
 
-        if config_.get("actions") is None:
-            return None
+        if source.get("actions") is None:
+            return []
 
-        for action_name in sorted(config_["actions"]):
-            self._make_action(
-                prototype=prototype,
-                action=config_["actions"][action_name],
-                action_name=action_name,
-                definition_data=definition_data,
-            )
+        actions = []
+        for action_name, action_source in sorted(source.get("actions", {}).items(), key=lambda i: i[0]):
+            action_source["action_name"] = action_name
+            actions.append((cls._make(source=action_source, prototype=prototype), action_source))
 
-        return None
+        return actions
 
-    def _make_action(
-        self, prototype: PrototypeData, action: dict, action_name: str, definition_data: DefinitionData
-    ) -> None:
+    @classmethod
+    def _make(cls, source: dict, prototype: PrototypeData) -> "ActionData":
         # pylint: disable=too-many-branches,too-many-statements
+        action_name = source["action_name"]
         validate_name(action_name, f"Action name \"{action_name}\" of {prototype.ref}")
-        action_data = ActionData(prototype=prototype, name=action_name, type=action["type"])
+
+        action_data = ActionData(prototype_ref=prototype.ref, name=action_name, type=source["type"])
 
         if action_data.type == "job":
-            action.script = action["script"]
-            action.script_type = action["script_type"]
+            action_data.script = source["script"]
+            action_data.script_type = source["script_type"]
 
-        action_data.display_name = self._get_display_name(conf=action, prototype=prototype)
+        action_data.display_name = cls._get_display_name(source=source, prototype=prototype)
 
-        if action.get("description") is not None:
-            action_data.description = action["description"]
-        if action.get("allow_to_terminate") is not None:
-            action_data.allow_to_terminate = action["allow_to_terminate"]
-        if action.get("partial_execution") is not None:
-            action_data.partial_execution = action["partial_execution"]
-        if action.get("host_action") is not None:
-            action_data.host_action = action["host_action"]
-        if action.get("ui_options") is not None:
-            action_data.ui_options = action["ui_options"]
-        if action.get("params") is not None:
-            action_data.params = action["params"]
-        if action.get("log_files") is not None:
-            action_data.log_files = action["log_files"]
-        if action.get("venv") is not None:
-            action_data.venv = action["venv"]
-        if action.get("allow_in_maintenance_mode") is not None:
-            action_data.allow_in_maintenance_mode = action["allow_in_maintenance_mode"]
-        if action.get("hc_acl") is not None:
-            action_data.hostcomponentmap = self._get_fixed_action_hc_acl(prototype=prototype, action=action)
+        value, legit = cls._dict_get(source=source, key="description")
+        if legit:
+            action_data.description = value
+        value, legit = cls._dict_get(source=source, key="allow_to_terminate")
+        if legit:
+            action_data.allow_to_terminate = value
+        value, legit = cls._dict_get(source=source, key="partial_execution")
+        if legit:
+            action_data.partial_execution = value
+        value, legit = cls._dict_get(source=source, key="host_action")
+        if legit:
+            action_data.host_action = value
+        value, legit = cls._dict_get(source=source, key="ui_options")
+        if legit:
+            action_data.ui_options = value
+        value, legit = cls._dict_get(source=source, key="params")
+        if legit:
+            action_data.params = value
+        value, legit = cls._dict_get(source=source, key="log_files")
+        if legit:
+            action_data.log_files = value
+        value, legit = cls._dict_get(source=source, key="venv")
+        if legit:
+            action_data.venv = value
+        value, legit = cls._dict_get(source=source, key="allow_in_maintenance_mode")
+        if legit:
+            action_data.allow_in_maintenance_mode = value
+        _, legit = cls._dict_get(source=source, key="hc_acl")
+        if legit:
+            action_data.hostcomponentmap = cls._get_fixed_action_hc_acl(source=source, prototype=prototype)
 
-        if MASKING in action:
-            if STATES in action:
+        if MASKING in source:
+            if STATES in source:
                 raise AdcmEx(
                     "INVALID_OBJECT_DEFINITION",
                     f"Action {action_name} uses both mutual excluding states \"states\" and \"masking\"",
                 )
-            action_data.state_available = _deep_get(action, MASKING, STATE, AVAILABLE, default=ANY)
-            action_data.state_unavailable = _deep_get(action, MASKING, STATE, UNAVAILABLE, default=[])
-            action_data.state_on_success = _deep_get(action, ON_SUCCESS, STATE, default="")
-            action_data.state_on_fail = _deep_get(action, ON_FAIL, STATE, default="")
+            action_data.state_available = _deep_get(source, MASKING, STATE, AVAILABLE, default=ANY)
+            action_data.state_unavailable = _deep_get(source, MASKING, STATE, UNAVAILABLE, default=[])
+            action_data.state_on_success = _deep_get(source, ON_SUCCESS, STATE, default="")
+            action_data.state_on_fail = _deep_get(source, ON_FAIL, STATE, default="")
 
-            action_data.multi_state_available = _deep_get(action, MASKING, MULTI_STATE, AVAILABLE, default=ANY)
-            action_data.multi_state_unavailable = _deep_get(action, MASKING, MULTI_STATE, UNAVAILABLE, default=[])
-            action_data.multi_state_on_success_set = _deep_get(action, ON_SUCCESS, MULTI_STATE, SET, default=[])
-            action_data.multi_state_on_success_unset = _deep_get(action, ON_SUCCESS, MULTI_STATE, UNSET, default=[])
-            action_data.multi_state_on_fail_set = _deep_get(action, ON_FAIL, MULTI_STATE, SET, default=[])
-            action_data.multi_state_on_fail_unset = _deep_get(action, ON_FAIL, MULTI_STATE, UNSET, default=[])
+            action_data.multi_state_available = _deep_get(source, MASKING, MULTI_STATE, AVAILABLE, default=ANY)
+            action_data.multi_state_unavailable = _deep_get(source, MASKING, MULTI_STATE, UNAVAILABLE, default=[])
+            action_data.multi_state_on_success_set = _deep_get(source, ON_SUCCESS, MULTI_STATE, SET, default=[])
+            action_data.multi_state_on_success_unset = _deep_get(source, ON_SUCCESS, MULTI_STATE, UNSET, default=[])
+            action_data.multi_state_on_fail_set = _deep_get(source, ON_FAIL, MULTI_STATE, SET, default=[])
+            action_data.multi_state_on_fail_unset = _deep_get(source, ON_FAIL, MULTI_STATE, UNSET, default=[])
         else:
-            if ON_SUCCESS in action or ON_FAIL in action:
+            if ON_SUCCESS in source or ON_FAIL in source:
                 raise AdcmEx(
                     "INVALID_OBJECT_DEFINITION",
                     f"Action {action_name} uses \"on_success/on_fail\" states without \"masking\"",
                 )
-            action_data.state_available = _deep_get(action, STATES, AVAILABLE, default=[])
+            action_data.state_available = _deep_get(source, STATES, AVAILABLE, default=[])
             action_data.state_unavailable = []
-            action_data.state_on_success = _deep_get(action, STATES, ON_SUCCESS, default="")
-            action_data.state_on_fail = _deep_get(action, STATES, ON_FAIL, default="")
+            action_data.state_on_success = _deep_get(source, STATES, ON_SUCCESS, default="")
+            action_data.state_on_fail = _deep_get(source, STATES, ON_FAIL, default="")
 
             action_data.multi_state_available = ANY
             action_data.multi_state_unavailable = []
@@ -468,48 +406,146 @@ class BundleDefinition:
             action_data.multi_state_on_fail_set = []
             action_data.multi_state_on_fail_unset = []
 
-        self._make_sub_actions(action=action, action_data=action_data, definition_data=definition_data)
-        # TODO: cm.stack.save_prototype_config
-
-        definition_data.actions.append(action_data)
+        # TODO: do something with __job's__ `script` and `script_type` fields
+        # cls._validate(action_data=action_data)
+        return action_data
 
     @staticmethod
-    def _get_fixed_action_hc_acl(prototype: PrototypeData, action: dict) -> List[dict]:
-        hostcomponentmap = deepcopy(action.get("hc_acl", []))
+    def _get_fixed_action_hc_acl(source: dict, prototype: PrototypeData) -> list[dict]:
+        hostcomponentmap = deepcopy(source.get("hc_acl", []))
 
         for idx, item in enumerate(hostcomponentmap):
             if "service" not in item:
                 if prototype.type == "service":
                     item["service"] = prototype.name
-                    action["hc_acl"][idx]["service"] = prototype.name
+                    hostcomponentmap[idx]["service"] = prototype.name
 
         return hostcomponentmap
 
-    def _make_sub_actions(self, action: dict, action_data: ActionData, definition_data: DefinitionData):
+
+class SubActionData(BaseData):
+    # action: ActionData
+    action_ref: str  # TODO: questionable
+
+    name: str
+    display_name: str = ""
+    script: str
+    script_type: str
+    state_on_fail: str = ""
+    multi_state_on_fail_set: Json[list] = []
+    multi_state_on_fail_unset: Json[list] = []
+    params: Json[dict] = {}
+    allow_to_terminate: bool | None = None
+
+    @classmethod
+    def make_bulk(cls, action_data: ActionData, action_source: dict) -> list["SubActionData"]:
         if action_data.type != "task":
-            return
+            return []
 
-        for sub in action["scripts"]:
-            subaction_data = SubActionData(
-                action=action_data, name=sub["name"], script=sub["script"], script_type=sub["script_type"]
+        sub_actions = []
+        for sub in action_source["scripts"]:
+            sub_actions.append(cls._make(action_data=action_data, sub_action_source=sub))
+
+        return sub_actions
+
+    @classmethod
+    def _make(cls, action_data: ActionData, sub_action_source: dict) -> "SubActionData":
+        subaction_data = cls(
+            action_ref=action_data.ref,
+            name=sub_action_source["name"],
+            script=sub_action_source["script"],
+            script_type=sub_action_source["script_type"],
+        )
+
+        subaction_data.display_name = sub_action_source["name"]
+        if "display_name" in sub_action_source:
+            subaction_data.display_name = sub_action_source["display_name"]
+
+        value, legit = cls._dict_get(source=sub_action_source, key="params")
+        if legit:
+            subaction_data.params = value
+        value, legit = cls._dict_get(source=sub_action_source, key="allow_to_terminate")
+        if legit:
+            subaction_data.allow_to_terminate = value
+
+        on_fail = sub_action_source.get(ON_FAIL, "")
+        if isinstance(on_fail, str):
+            subaction_data.state_on_fail = on_fail
+            subaction_data.multi_state_on_fail_set = []
+            subaction_data.multi_state_on_fail_unset = []
+        elif isinstance(on_fail, dict):
+            subaction_data.state_on_fail = _deep_get(on_fail, STATE, default="")
+            subaction_data.multi_state_on_fail_set = _deep_get(on_fail, MULTI_STATE, SET, default=[])
+            subaction_data.multi_state_on_fail_unset = _deep_get(on_fail, MULTI_STATE, UNSET, default=[])
+
+        return subaction_data
+
+
+class BundleDefinition:
+    """
+    Class for saving whole bundle definition in python's structures
+    to perform validations and save bundle to DB
+    """
+
+    def __init__(self):
+        self._definitions = []
+        self._validate_funcs = (self._validate_actions, self._validate_components, self._validate_config)
+
+    def add_definition(self, definition_file: DefinitionFile) -> None:
+        """Split objects' definitions into python objects"""
+        definition_data = DefinitionData(definition_file=definition_file)
+        obj_list = {}
+
+        if isinstance(definition_file.config, dict):
+            check_object_definition(
+                definition_file.filename, definition_file.config, definition_file.config["type"], obj_list
             )
+            self._make_objects(config=definition_file.config, definition_data=definition_data)
 
-            subaction_data.display_name = sub["name"]
-            if "display_name" in sub:
-                subaction_data.display_name = sub["display_name"]
-            if sub.get("params") is not None:
-                subaction_data.params = sub["params"]
-            if sub.get("allow_to_terminate") is not None:
-                subaction_data.allow_to_terminate = sub["allow_to_terminate"]
+        elif isinstance(definition_file.config, list):
+            for obj_def in definition_file.config:
+                check_object_definition(definition_file.filename, obj_def, obj_def["type"], obj_list)
+                self._make_objects(config=obj_def, definition_data=definition_data)
 
-            on_fail = sub.get(ON_FAIL, "")
-            if isinstance(on_fail, str):
-                subaction_data.state_on_fail = on_fail
-                subaction_data.multi_state_on_fail_set = []
-                subaction_data.multi_state_on_fail_unset = []
-            elif isinstance(on_fail, dict):
-                subaction_data.state_on_fail = _deep_get(on_fail, STATE, default="")
-                subaction_data.multi_state_on_fail_set = _deep_get(on_fail, MULTI_STATE, SET, default=[])
-                subaction_data.multi_state_on_fail_unset = _deep_get(on_fail, MULTI_STATE, UNSET, default=[])
+        else:
+            raise NotImplementedError
 
-            definition_data.sub_actions.append(subaction_data)
+        self._definitions.append(definition_data)
+
+    @staticmethod
+    def _make_objects(config: dict, definition_data: DefinitionData) -> None:
+        prototype = PrototypeData.make(source=config, definition_data=definition_data)
+        definition_data.prototypes.append(prototype)
+
+        for action_data, action_source in ActionData.make_bulk(source=config, prototype=prototype):
+            definition_data.actions.append(action_data)
+            for sub_action in SubActionData.make_bulk(action_data=action_data, action_source=action_source):
+                definition_data.sub_actions.append(sub_action)
+
+        # TODO: save_upgrade
+        # TODO: save_components
+        # TODO: save_prototype_config
+        # TODO: save_export
+        # TODO: save_import
+
+    def save_to_db(self) -> None:
+        pass
+
+    def validate(self):
+        # TODO: remove dev code
+        # from pprint import pformat
+        # logger.critical(f"DEBUG_BUNDLE_DEF\n{pformat(self._definitions)}")
+        self._validate()
+
+    def _validate_actions(self):
+        pass
+
+    def _validate_components(self):
+        pass
+
+    def _validate_config(self):
+        pass
+
+    def _validate(self):
+        for validate_func in self._validate_funcs:
+            validate_func()

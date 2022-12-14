@@ -24,7 +24,9 @@ from version_utils import rpm
 import cm.stack
 import cm.status_api
 from cm.adcm_config import init_object_config, proto_ref, switch_config
-from cm.bundle_definition import BundleDefinition, Definition
+
+# from cm.bundle_definition import BundleDefinition, Definition
+from cm.bundle_definition import BundleDefinition, DefinitionFile
 from cm.errors import AdcmEx
 from cm.errors import raise_adcm_ex as err
 from cm.logger import logger
@@ -72,9 +74,9 @@ def load_bundle(bundle_file) -> Bundle:
     path = untar_safe(bundle_hash=bundle_hash, path=bundle_path)
 
     try:
-        bundle_def = BundleDefinition(bundle_hash=bundle_hash)
+        bundle_def = BundleDefinition()
 
-        definitions = get_bundle_definitions(path=path, bundle_hash=bundle_hash)  # ???
+        definitions = get_bundle_definitions(path=path, bundle_hash=bundle_hash)
         if not definitions:
             raise AdcmEx("BUNDLE_ERROR", f"Can't find any definitions in bundle {bundle_file}")
 
@@ -82,7 +84,7 @@ def load_bundle(bundle_file) -> Bundle:
             bundle_def.add_definition(definition)
 
         bundle_def.validate()
-        bundle_def.save()
+        bundle_def.save_to_db()
 
         process_bundle(path, bundle_hash)  # TODO: remove
         bundle_proto = get_stage_bundle(bundle_file)  # TODO: remove
@@ -252,17 +254,18 @@ def upgrade_adcm(adcm, bundle):
     return adcm
 
 
-def get_bundle_definitions(path: str, bundle_hash: str) -> List[Definition]:
+def get_bundle_definitions(path: str, bundle_hash: str) -> List[DefinitionFile]:
     definitions = []
 
     for conf_path, conf_file, conf_type in cm.stack.get_config_files(path=path, bundle_hash=bundle_hash):
         definition = cm.stack.read_definition(conf_file, conf_type)
         if definition:
             definitions.append(
-                Definition(
+                DefinitionFile(
                     path=conf_path,
-                    fname=conf_file,
-                    conf=definition,
+                    filename=conf_file,
+                    config=definition,
+                    bundle_hash=bundle_hash,
                 )
             )
 
