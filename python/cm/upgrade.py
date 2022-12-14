@@ -334,6 +334,7 @@ def revert_object(obj, old_proto):
 def bundle_revert(obj: Union[Cluster, HostProvider]) -> None:  # pylint: disable=too-many-locals
     if not isinstance(obj, (Cluster, HostProvider)):
         raise_adcm_ex("UPGRADE_ERROR", f"Object must be cluster or provider, not {obj.prototype.type}")
+
     upgraded_bundle = obj.prototype.bundle
     old_bundle = Bundle.objects.get(pk=obj.before_upgrade["bundle_id"])
     old_proto = Prototype.objects.filter(bundle=old_bundle, name=old_bundle.name).first()
@@ -341,26 +342,29 @@ def bundle_revert(obj: Union[Cluster, HostProvider]) -> None:  # pylint: disable
     services = obj.before_upgrade.get("services")
 
     revert_object(obj, old_proto)
+
     if isinstance(obj, Cluster):
         for service_proto in Prototype.objects.filter(bundle=old_bundle, type="service"):
             service = ClusterObject.objects.filter(cluster=obj, prototype__name=service_proto.name).first()
-            if service:
-                revert_object(service, service_proto)
-                for component_proto in Prototype.objects.filter(
-                    bundle=old_bundle, parent=service_proto, type="component"
-                ):
-                    comp = ServiceComponent.objects.filter(
-                        cluster=obj, service=service, prototype__name=component_proto.name
-                    ).first()
-                    if comp:
-                        revert_object(comp, component_proto)
-                    else:
-                        sc = ServiceComponent.objects.create(cluster=obj, service=service, prototype=component_proto)
-                        obj_conf = init_object_config(component_proto, sc)
-                        sc.config = obj_conf
-                        sc.save()
+            if not service:
+                continue
+
+            revert_object(service, service_proto)
+            for component_proto in Prototype.objects.filter(bundle=old_bundle, parent=service_proto, type="component"):
+                comp = ServiceComponent.objects.filter(
+                    cluster=obj, service=service, prototype__name=component_proto.name
+                ).first()
+                if comp:
+                    revert_object(comp, component_proto)
+                else:
+                    sc = ServiceComponent.objects.create(cluster=obj, service=service, prototype=component_proto)
+                    obj_conf = init_object_config(component_proto, sc)
+                    sc.config = obj_conf
+                    sc.save()
+
         ClusterObject.objects.filter(cluster=obj, prototype__bundle=upgraded_bundle).delete()
         ServiceComponent.objects.filter(cluster=obj, prototype__bundle=upgraded_bundle).delete()
+
         for service in services:
             proto = Prototype.objects.get(bundle=old_bundle, name=service, type="service")
             try:
@@ -374,7 +378,6 @@ def bundle_revert(obj: Union[Cluster, HostProvider]) -> None:  # pylint: disable
             service = ClusterObject.objects.get(prototype__name=hc["service"], cluster=obj)
             comp = ServiceComponent.objects.get(prototype__name=hc["component"], cluster=obj, service=service)
             host_comp_list.append((service, host, comp))
-
         save_hc(obj, host_comp_list)
 
     if isinstance(obj, HostProvider):

@@ -281,12 +281,12 @@ def check_upgrade_scripts(proto, conf, label):
                 if count > 1:
                     msg = "Script with script_type \"internal\" must be unique in {} of {}"
                     err("INVALID_UPGRADE_DEFINITION", msg.format(label, ref))
-                if action["script"] not in ["bundle_switch", "bundle_revert"]:
+                if action["script"] not in ("bundle_switch", "bundle_revert"):
                     msg = (
-                        "Script with script_type \"internal\" should be marked as"
-                        " \"bundle_switch\" or \"bundle_revert\" in {} of {}"
+                        f"Script with script_type \"internal\" should be marked as"
+                        f" \"bundle_switch\" or \"bundle_revert\" in {label} of {ref}"
                     )
-                    err("INVALID_UPGRADE_DEFINITION", msg.format(label, ref))
+                    err("INVALID_UPGRADE_DEFINITION", msg)
         if count == 0:
             msg = "Scripts block in {} of {} must contain exact one block with script \"bundle_switch\""
             err("INVALID_UPGRADE_DEFINITION", msg.format(label, ref))
