@@ -560,6 +560,7 @@ def get_service_and_components_prototype(bundle1, bundle2):
 def refresh_objects(list_for_refresh: list):
     for item in list_for_refresh:
         item.refresh_from_db()
+
     return list_for_refresh
 
 
@@ -569,6 +570,7 @@ def get_default_services_and_component(cluster):
     comp_11 = ServiceComponent.objects.get(cluster=cluster, service=service_1, prototype__name="server")
     comp_12 = ServiceComponent.objects.get(cluster=cluster, service=service_1, prototype__name="node")
     comp_21 = ServiceComponent.objects.get(cluster=cluster, service=service_2, prototype__name="server")
+
     return service_1, service_2, comp_11, comp_12, comp_21
 
 
@@ -631,11 +633,13 @@ class TestRevertUpgrade(TestCase):
         do_upgrade(provider, upgrade, {}, {}, [])
 
         provider, host = refresh_objects([provider, host])
+
         self.assertEqual(host.prototype, hp2)
         self.assertEqual(provider.prototype, pp2)
 
         bundle_revert(provider)
 
         provider, host = refresh_objects([provider, host])
+
         self.assertEqual(host.prototype, hp1)
         self.assertEqual(provider.prototype, pp1)

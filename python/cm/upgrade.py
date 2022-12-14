@@ -332,8 +332,6 @@ def revert_object(obj, old_proto):
 
 
 def bundle_revert(obj: Union[Cluster, HostProvider]) -> None:  # pylint: disable=too-many-locals
-    if not isinstance(obj, (Cluster, HostProvider)):
-        raise_adcm_ex("UPGRADE_ERROR", f"Object must be cluster or provider, not {obj.prototype.type}")
 
     upgraded_bundle = obj.prototype.bundle
     old_bundle = Bundle.objects.get(pk=obj.before_upgrade["bundle_id"])
@@ -390,6 +388,7 @@ def set_before_upgrade(obj: ADCMEntity) -> None:
     obj.before_upgrade["state"] = obj.state
     if obj.config:
         obj.before_upgrade["config"] = obj.config.current
+
     if isinstance(obj, Cluster):
         hc_map = []
         for hc in HostComponent.objects.filter(cluster=obj):
@@ -400,6 +399,7 @@ def set_before_upgrade(obj: ADCMEntity) -> None:
                     "host": hc.host.name,
                 }
             )
+
         obj.before_upgrade["hc"] = hc_map
         obj.before_upgrade["services"] = [
             service.prototype.name for service in ClusterObject.objects.filter(cluster=obj)
@@ -409,11 +409,13 @@ def set_before_upgrade(obj: ADCMEntity) -> None:
 
 def update_before_upgrade(obj: Union[Cluster, HostProvider]):
     set_before_upgrade(obj)
+
     if isinstance(obj, Cluster):
         for service in ClusterObject.objects.filter(cluster=obj):
             set_before_upgrade(service)
             for component in ServiceComponent.objects.filter(service=service, cluster=obj):
                 set_before_upgrade(component)
+
     if isinstance(obj, HostProvider):
         for host in Host.objects.filter(provider=obj):
             set_before_upgrade(host)
@@ -436,8 +438,10 @@ def do_upgrade(
     logger.info("upgrade %s version %s (upgrade #%s)", obj_ref(obj), old_proto.version, upgrade.id)
 
     task_id = None
+
     obj.before_upgrade["bundle_id"] = old_proto.bundle.id
     update_before_upgrade(obj)
+
     if not upgrade.action:
         bundle_switch(obj, upgrade)
         if upgrade.state_on_success:
