@@ -37,7 +37,7 @@ from cm.models import (
     Upgrade,
 )
 from cm.tests.utils import gen_cluster
-from cm.upgrade import check_upgrade, do_upgrade, switch_components
+from cm.upgrade import bundle_revert, check_upgrade, do_upgrade, switch_components
 
 
 def cook_cluster_bundle(ver):
@@ -537,3 +537,105 @@ class TestUpgrade(TestCase):
 
         self.assertEqual(h1.id, h2.id)
         self.assertEqual(h2.prototype.id, new_proto.id)
+
+
+def get_service_and_components_prototype(bundle1, bundle2):
+    s1p1 = Prototype.objects.get(bundle=bundle1, type="service", name="hadoop")
+    s1p2 = Prototype.objects.get(bundle=bundle2, type="service", name="hadoop")
+
+    s2p1 = Prototype.objects.get(bundle=bundle1, type="service", name="hive")
+    s2p2 = Prototype.objects.get(bundle=bundle2, type="service", name="hive")
+
+    c11p1 = Prototype.objects.get(bundle=bundle1, type="component", name="server", parent=s1p1)
+    c11p2 = Prototype.objects.get(bundle=bundle2, type="component", name="server", parent=s1p2)
+
+    c12p1 = Prototype.objects.get(bundle=bundle1, type="component", name="node", parent=s1p1)
+    c12p2 = Prototype.objects.get(bundle=bundle2, type="component", name="node", parent=s1p2)
+
+    c21p1 = Prototype.objects.get(bundle=bundle1, type="component", name="server", parent=s2p1)
+    c21p2 = Prototype.objects.get(bundle=bundle2, type="component", name="server", parent=s2p2)
+    return s1p1, s1p2, s2p1, s2p2, c11p1, c11p2, c12p1, c12p2, c21p1, c21p2
+
+
+def refresh_objects(list_for_refresh: list):
+    for item in list_for_refresh:
+        item.refresh_from_db()
+    return list_for_refresh
+
+
+def get_default_services_and_component(cluster):
+    service_1 = ClusterObject.objects.get(cluster=cluster, prototype__name="hadoop")
+    service_2 = ClusterObject.objects.get(cluster=cluster, prototype__name="hive")
+    comp_11 = ServiceComponent.objects.get(cluster=cluster, service=service_1, prototype__name="server")
+    comp_12 = ServiceComponent.objects.get(cluster=cluster, service=service_1, prototype__name="node")
+    comp_21 = ServiceComponent.objects.get(cluster=cluster, service=service_2, prototype__name="server")
+    return service_1, service_2, comp_11, comp_12, comp_21
+
+
+class TestRevertUpgrade(TestCase):
+    def test_simple_revert_upgrade(self):  # pylint: disable=too-many-locals
+        b1 = cook_cluster_bundle("1.0")
+        b2 = cook_cluster_bundle("2.0")
+        s1p1, s1p2, s2p1, s2p2, c11p1, c11p2, c12p1, c12p2, c21p1, c21p2 = get_service_and_components_prototype(b1, b2)
+
+        cluster = cook_cluster(b1, "Test0")
+        upgrade = cook_upgrade(b2)
+
+        service_1, service_2, comp_11, comp_12, comp_21 = get_default_services_and_component(cluster)
+
+        self.assertEqual(service_1.prototype, s1p1)
+        self.assertEqual(service_2.prototype, s2p1)
+        self.assertEqual(comp_11.prototype, c11p1)
+        self.assertEqual(comp_12.prototype, c12p1)
+        self.assertEqual(comp_21.prototype, c21p1)
+
+        do_upgrade(cluster, upgrade, {}, {}, [])
+
+        service_1, service_2, comp_11, comp_12, comp_21 = refresh_objects(
+            [service_1, service_2, comp_11, comp_12, comp_21]
+        )
+
+        self.assertEqual(service_1.prototype, s1p2)
+        self.assertEqual(service_2.prototype, s2p2)
+        self.assertEqual(comp_11.prototype, c11p2)
+        self.assertEqual(comp_12.prototype, c12p2)
+        self.assertEqual(comp_21.prototype, c21p2)
+
+        bundle_revert(cluster)
+
+        service_1, service_2, comp_11, comp_12, comp_21 = refresh_objects(
+            [service_1, service_2, comp_11, comp_12, comp_21]
+        )
+
+        self.assertEqual(service_1.prototype, s1p1)
+        self.assertEqual(service_2.prototype, s2p1)
+        self.assertEqual(comp_11.prototype, c11p1)
+        self.assertEqual(comp_12.prototype, c12p1)
+        self.assertEqual(comp_21.prototype, c21p1)
+
+    def test_provider_revert(self):
+        b1 = cook_provider_bundle("1.0")
+        b2 = cook_provider_bundle("2.0")
+        provider = cook_provider(b1, "DF01")
+        upgrade = cook_upgrade(b2)
+
+        host = Host.objects.get(provider=provider, fqdn="server01.inter.net")
+        hp1 = Prototype.objects.get(type="host", name="DfHost", bundle=b1)
+        hp2 = Prototype.objects.get(type="host", name="DfHost", bundle=b2)
+        pp1 = Prototype.objects.get(type="provider", bundle=b1)
+        pp2 = Prototype.objects.get(type="provider", bundle=b2)
+
+        self.assertEqual(host.prototype, hp1)
+        self.assertEqual(provider.prototype, pp1)
+
+        do_upgrade(provider, upgrade, {}, {}, [])
+
+        provider, host = refresh_objects([provider, host])
+        self.assertEqual(host.prototype, hp2)
+        self.assertEqual(provider.prototype, pp2)
+
+        bundle_revert(provider)
+
+        provider, host = refresh_objects([provider, host])
+        self.assertEqual(host.prototype, hp1)
+        self.assertEqual(provider.prototype, pp1)
