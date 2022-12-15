@@ -40,7 +40,7 @@ export class FieldComponent extends BaseDirective implements OnInit, OnChanges {
   @Input()
   form: FormGroup;
   currentFormGroup: FormGroup;
-
+  noRefreshButtonFields = ['password', 'secrettext', 'secretmap'];
   disabled: boolean = false;
 
   @ViewChild('cc') inputControl: FieldDirective;
@@ -51,6 +51,10 @@ export class FieldComponent extends BaseDirective implements OnInit, OnChanges {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!changes.form.firstChange) this.initCurrentGroup();
+  }
+
+  isSecretField(): boolean {
+    return this.noRefreshButtonFields.includes(this.options.controlType);
   }
 
   initCurrentGroup() {
