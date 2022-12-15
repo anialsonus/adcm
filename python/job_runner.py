@@ -224,10 +224,13 @@ def main(job_id):
     logger.debug("job_runner.py called as: %s", sys.argv)
     job = JobLog.objects.get(id=job_id)
     job_type = job.sub_action.script_type if job.sub_action else job.action.script_type
+
     if job_type == "internal":
         run_upgrade(job)
+
     elif job_type == "python":
         run_python(job)
+
     else:
         run_ansible(job_id)
 

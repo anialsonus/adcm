@@ -352,6 +352,7 @@ def bundle_revert(obj: Union[Cluster, HostProvider]) -> None:  # pylint: disable
                 comp = ServiceComponent.objects.filter(
                     cluster=obj, service=service, prototype__name=component_proto.name
                 ).first()
+
                 if comp:
                     revert_object(comp, component_proto)
                 else:
@@ -376,6 +377,7 @@ def bundle_revert(obj: Union[Cluster, HostProvider]) -> None:  # pylint: disable
             service = ClusterObject.objects.get(prototype__name=hc["service"], cluster=obj)
             comp = ServiceComponent.objects.get(prototype__name=hc["component"], cluster=obj, service=service)
             host_comp_list.append((service, host, comp))
+
         save_hc(obj, host_comp_list)
 
     if isinstance(obj, HostProvider):
@@ -404,6 +406,7 @@ def set_before_upgrade(obj: ADCMEntity) -> None:
         obj.before_upgrade["services"] = [
             service.prototype.name for service in ClusterObject.objects.filter(cluster=obj)
         ]
+
     obj.save()
 
 
