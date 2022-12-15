@@ -169,10 +169,12 @@ def run_upgrade(job):
     try:
         with transaction.atomic():
             script = job.sub_action.script if job.sub_action else job.action.script
+
             if script == "bundle_switch":
                 bundle_switch(job.task.task_object, job.action.upgrade)
             elif script == "bundle_revert":
                 bundle_revert(job.task.task_object)
+
             switch_hc(job.task, job.action)
     except AdcmEx as e:
         err_file.write(e.msg)
@@ -224,13 +226,10 @@ def main(job_id):
     logger.debug("job_runner.py called as: %s", sys.argv)
     job = JobLog.objects.get(id=job_id)
     job_type = job.sub_action.script_type if job.sub_action else job.action.script_type
-
     if job_type == "internal":
         run_upgrade(job)
-
     elif job_type == "python":
         run_python(job)
-
     else:
         run_ansible(job_id)
 
