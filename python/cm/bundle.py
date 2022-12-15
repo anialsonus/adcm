@@ -24,8 +24,6 @@ from version_utils import rpm
 import cm.stack
 import cm.status_api
 from cm.adcm_config import init_object_config, proto_ref, switch_config
-
-# from cm.bundle_definition import BundleDefinition, Definition
 from cm.bundle_definition import BundleDefinition, DefinitionFile
 from cm.errors import AdcmEx
 from cm.errors import raise_adcm_ex as err

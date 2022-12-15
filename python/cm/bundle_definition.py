@@ -45,10 +45,10 @@ DEFAULT_CONSTRAINT = [0, "+"]
 
 
 class DefinitionFile(BaseModel):
-    path: str
-    filename: str
-    config: dict | list[dict]
     bundle_hash: str
+    config: dict | list[dict]
+    filename: str
+    path: str
 
 
 class DefinitionData(BaseModel):
@@ -251,8 +251,8 @@ class ActionData(BaseData):
     ui_options: Json[dict] = {}
 
     type: str
-    script: str | None = None
-    script_type: str | None = None
+    script: str = ""
+    script_type: str = ""
 
     state_available: Json[list] = []
     state_unavailable: Json[list] = []
@@ -281,14 +281,6 @@ class ActionData(BaseData):
     def ref(self):
         return f"Action \"{self.name}\" of proto \"{self.prototype_ref}\""
 
-    @staticmethod
-    def _validate(action_data: "ActionData"):
-        if action_data.script is None:
-            raise RuntimeError("Field `script` is required")
-
-        if action_data.script_type is None:
-            raise RuntimeError("Field `script_type` is required")
-
     @classmethod
     def make_bulk(
         cls, source: dict, prototype: PrototypeData, upgrade: UpgradeData | None = None
@@ -315,9 +307,6 @@ class ActionData(BaseData):
             source["action_name"] = action_name
 
             return [(cls._make(source=source, prototype=prototype), source)]
-
-        if source.get("actions") is None:
-            return []
 
         actions = []
         for action_name, action_source in sorted(source.get("actions", {}).items(), key=lambda i: i[0]):
@@ -406,8 +395,6 @@ class ActionData(BaseData):
             action_data.multi_state_on_fail_set = []
             action_data.multi_state_on_fail_unset = []
 
-        # TODO: do something with __job's__ `script` and `script_type` fields
-        # cls._validate(action_data=action_data)
         return action_data
 
     @staticmethod
