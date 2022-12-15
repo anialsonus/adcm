@@ -14,10 +14,10 @@ import hashlib
 import re
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from django.conf import settings
-from pydantic import BaseModel, Json  # pylint: disable=no-name-in-module
+from pydantic import BaseModel, Extra, Json  # pylint: disable=no-name-in-module
 
 from cm.errors import AdcmEx
 from cm.logger import logger
@@ -35,6 +35,7 @@ from cm.stack import (
     UNSET,
     _deep_get,
     check_object_definition,
+    check_upgrade,
     validate_name,
 )
 
@@ -42,6 +43,7 @@ from cm.stack import (
 
 
 DEFAULT_CONSTRAINT = [0, "+"]
+DEFAULT_FROM_EDITION = ["community"]
 
 
 class DefinitionFile(BaseModel):
@@ -67,6 +69,10 @@ class DefinitionData(BaseModel):
 class BaseData(BaseModel):
     _none_allowed_fields = ()
     _to_db_fields = set()
+
+    # TODO: 1. prepare data; 2.Model.from_obj(data) to prevent misspells
+    class Config:
+        extra = Extra.forbid
 
     def _get_db_dict(self) -> dict:
         return self.dict(include=self._to_db_fields)
@@ -236,11 +242,6 @@ class PrototypeData(BaseData):
         return "absent"
 
 
-class UpgradeData(BaseData):
-    def __getattr__(self, item):  # TODO: remove tmp code
-        return "NOT_DEFINED"
-
-
 class ActionData(BaseData):
     # prototype: PrototypeData
     prototype_ref: str  # TODO: questionable
@@ -277,14 +278,17 @@ class ActionData(BaseData):
 
     venv: str = "default"
 
+    # #field to link upgrade to action DO NOT USE IN DB  # TODO: remove comment when save_to_db() is done
+    # upgrade_ref: str | None = None
+
     @property
     def ref(self):
         return f"Action \"{self.name}\" of proto \"{self.prototype_ref}\""
 
     @classmethod
     def make_bulk(
-        cls, source: dict, prototype: PrototypeData, upgrade: UpgradeData | None = None
-    ) -> list[tuple["ActionData", dict | None]]:
+        cls, source: dict, prototype: PrototypeData, upgrade: Optional["UpgradeData"] = None
+    ) -> list[tuple["ActionData", dict]]:
         source = deepcopy(source)
 
         if source.get("versions") is not None:
@@ -468,6 +472,97 @@ class SubActionData(BaseData):
         return subaction_data
 
 
+class UpgradeData(BaseData):
+    name: str = ""
+    description: str = ""
+    min_version: str
+    max_version: str
+    min_strict: bool = False
+    max_strict: bool = False
+    from_edition: Json[list[str]] = DEFAULT_FROM_EDITION
+    state_available: Json[list] = []
+    state_on_success: str = ""
+    # action: Optional["ActionData"] = None
+    action_ref: str = ""  # TODO: questionable
+
+    @property
+    def ref(self):
+        return f"Upgrade \"{self.name}\" of action \"{self.action_ref}\""
+
+    @classmethod
+    def make_bulk(
+        cls, prototype: PrototypeData, source: dict
+    ) -> list[tuple["UpgradeData", ActionData | None, dict | None]]:
+        upgrades = []
+        for item in source.get("upgrade", []):
+            upgrades.append(cls._make(prototype=prototype, source=item))
+
+        return upgrades
+
+    @classmethod
+    def _make(cls, prototype: PrototypeData, source: dict) -> tuple["UpgradeData", ActionData | None, dict | None]:
+        # pylint: disable=too-many-branches
+        source = deepcopy(source)
+
+        check_upgrade(prototype, source)
+
+        if "min" in source["versions"]:
+            min_version = source["versions"]["min"]
+            min_strict = False
+        elif "min_strict" in source["versions"]:
+            min_version = source["versions"]["min_strict"]
+            min_strict = True
+        else:
+            raise RuntimeError("no min/min_strict version defined")
+
+        if "max" in source["versions"]:
+            max_version = source["versions"]["max"]
+            max_strict = False
+        elif "max_strict" in source["versions"]:
+            max_version = source["versions"]["max_strict"]
+            max_strict = True
+        else:
+            raise RuntimeError("no max/max_strict version defined")
+
+        upgrade = UpgradeData(
+            name=source["name"],
+            min_version=min_version,
+            min_strict=min_strict,
+            max_version=max_version,
+            max_strict=max_strict,
+        )
+
+        value, legit = cls._dict_get(source=source, key="description")
+        if legit:
+            upgrade.description = value
+
+        states = source.get("states", None)
+        if states is not None:
+            value, legit = cls._dict_get(source=states, key="available")
+            if legit:
+                upgrade.state_available = value
+            value, legit = cls._dict_get(source=states, key="on_success")
+            if legit:
+                upgrade.state_on_success = value
+
+        value, legit = cls._dict_get(source=source, key="from_edition")
+        if legit:
+            upgrade.from_edition = value
+
+        upgrade_action = None
+        upgrade_action_data = None
+        if "scripts" in source:
+            actions = ActionData.make_bulk(source=source, prototype=prototype, upgrade=upgrade)
+            if len(actions) != 1:
+                raise RuntimeError("Not one action for upgrade")
+            upgrade_action = actions[0][0]
+            upgrade_action_data = actions[0][1]
+
+            upgrade.action_ref = upgrade_action.ref
+
+        return upgrade, upgrade_action, upgrade_action_data
+
+
 class BundleDefinition:
     """
     Class for saving whole bundle definition in python's structures
@@ -509,9 +604,21 @@ class BundleDefinition:
             for sub_action in SubActionData.make_bulk(action_data=action_data, action_source=action_source):
                 definition_data.sub_actions.append(sub_action)
 
-        # TODO: save_upgrade
+        for upgrade, upgrade_action, upgrade_action_source in UpgradeData.make_bulk(
+            prototype=prototype,
+            source=config,
+        ):
+            # TODO: разобраться с upgrade action
+            definition_data.upgrades.append(upgrade)
+            if upgrade_action is not None:
+                definition_data.actions.append(upgrade_action)
+                for sub_action in SubActionData.make_bulk(
+                    action_data=upgrade_action, action_source=upgrade_action_source
+                ):
+                    definition_data.sub_actions.append(sub_action)
+
+        # TODO: save_prototype_config after each prototype, action, component
         # TODO: save_components
-        # TODO: save_prototype_config
         # TODO: save_export
         # TODO: save_import
 
