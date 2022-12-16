@@ -490,9 +490,7 @@ class UpgradeData(BaseData):
         return f"Upgrade \"{self.name}\" of action \"{self.action_ref}\""
 
     @classmethod
-    def make_bulk(
-        cls, prototype: PrototypeData, source: dict
-    ) -> list[tuple["UpgradeData", ActionData | None, dict | None]]:
+    def make_bulk(cls, prototype: PrototypeData, source: dict) -> list[tuple["UpgradeData", dict]]:
         upgrades = []
         for item in source.get("upgrade", []):
             upgrades.append(cls._make(prototype=prototype, source=item))
@@ -500,7 +498,7 @@ class UpgradeData(BaseData):
         return upgrades
 
     @classmethod
-    def _make(cls, prototype: PrototypeData, source: dict) -> tuple["UpgradeData", ActionData | None, dict | None]:
+    def _make(cls, prototype: PrototypeData, source: dict) -> tuple["UpgradeData", dict]:
         # pylint: disable=too-many-branches
         source = deepcopy(source)
 
@@ -549,18 +547,7 @@ class UpgradeData(BaseData):
         if legit:
             upgrade.from_edition = value
 
-        upgrade_action = None
-        upgrade_action_data = None
-        if "scripts" in source:
-            actions = ActionData.make_bulk(source=source, prototype=prototype, upgrade=upgrade)
-            if len(actions) != 1:
-                raise RuntimeError("Not one action for upgrade")
-            upgrade_action = actions[0][0]
-            upgrade_action_data = actions[0][1]
-
-            upgrade.action_ref = upgrade_action.ref
-
-        return upgrade, upgrade_action, upgrade_action_data
+        return upgrade, source
 
 
 class BundleDefinition:
@@ -604,16 +591,23 @@ class BundleDefinition:
             for sub_action in SubActionData.make_bulk(action_data=action_data, action_source=action_source):
                 definition_data.sub_actions.append(sub_action)
 
-        for upgrade, upgrade_action, upgrade_action_source in UpgradeData.make_bulk(
-            prototype=prototype,
-            source=config,
-        ):
-            # TODO: разобраться с upgrade action
+        for upgrade, upgrade_source in UpgradeData.make_bulk(prototype=prototype, source=config):
             definition_data.upgrades.append(upgrade)
-            if upgrade_action is not None:
-                definition_data.actions.append(upgrade_action)
+
+            # TODO: проверить на апгейдах с ["scripts"], когда upgrade.action != None
+            upgrade_action_data = None
+            upgrade_action_source = None
+            if "scripts" in upgrade_source:
+                actions = ActionData.make_bulk(source=upgrade_source, prototype=prototype, upgrade=upgrade)
+                if len(actions) != 1:
+                    raise RuntimeError("Not one action for upgrade")
+                upgrade_action_data, upgrade_action_source = actions[0]
+                upgrade.action_ref = upgrade_action_data.ref
+
+            if upgrade_action_data is not None:
+                definition_data.actions.append(upgrade_action_data)
                 for sub_action in SubActionData.make_bulk(
-                    action_data=upgrade_action, action_source=upgrade_action_source
+                    action_data=upgrade_action_data, action_source=upgrade_action_source
                 ):
                     definition_data.sub_actions.append(sub_action)
 
