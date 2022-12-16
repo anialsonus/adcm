@@ -102,9 +102,7 @@ export class PasswordComponent extends FieldDirective implements OnInit, AfterVi
                 this.control.setValue(this.value);
                 this.ConfirmPasswordField.setValue(this.value);
               }
-              if (this.control.value !== null) {
-                this.isHideDummy = false;
-              }
+              this.isHideDummy = false;
               this.cd.detectChanges();
             }
           })
@@ -145,8 +143,8 @@ export class PasswordComponent extends FieldDirective implements OnInit, AfterVi
       this.input.nativeElement.focus();
     }
 
-    this.control.setValue(null, { emit:false });
-    if (this.ConfirmPasswordField) this.ConfirmPasswordField.setValue(null, { emit:false });
+    this.control.setValue('');
+    if (this.ConfirmPasswordField) this.ConfirmPasswordField.setValue('');
   }
 
   get ConfirmPasswordField(): AbstractControl {
@@ -171,5 +169,12 @@ export class PasswordComponent extends FieldDirective implements OnInit, AfterVi
       return confirm.errors[error];
     }
     return null;
+  }
+
+  change(value: string) {
+    if (value === null) {
+      this.hideDummy(false);
+      this.cd.detectChanges();
+    }
   }
 }

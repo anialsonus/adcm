@@ -17,6 +17,8 @@ import { BaseMapListDirective } from '@app/shared/form-elements/map.component';
 import { SchemeComponent } from '../scheme/scheme.component';
 import { IFieldOptions } from '../types';
 import { BaseDirective } from '@adwp-ui/widgets';
+import { PasswordComponent } from "@app/shared/form-elements/password/password.component";
+import { SecretTextComponent } from "@app/shared/form-elements/secret-text/secret-text.component";
 
 export const CONFIG_FIELD = new InjectionToken('Config field');
 
@@ -44,6 +46,8 @@ export class FieldComponent extends BaseDirective implements OnInit, OnChanges {
   disabled: boolean = false;
 
   @ViewChild('cc') inputControl: FieldDirective;
+  @ViewChild('pass') passControl: FieldDirective;
+  @ViewChild('sc') secretTextControl: FieldDirective;
 
   ngOnInit() {
     this.initCurrentGroup();
@@ -112,5 +116,36 @@ export class FieldComponent extends BaseDirective implements OnInit, OnChanges {
       this.options.value = field.value;
       this.form.updateValueAndValidity();
     }
+  }
+
+  reset() {
+    const type = this.options.type;
+
+    if (this.disabled) return;
+    if (!this.noRefreshButtonFields.includes(type)) return;
+
+    const field = this.currentFormGroup.controls[this.options.name];
+
+    switch (type) {
+      case('password'):
+        field.setValue(null);
+        field.updateValueAndValidity();
+
+        const confirm = this.currentFormGroup.controls[`confirm_${this.options.name}`];
+        if (confirm) {
+          confirm.setValue(null);
+          confirm.updateValueAndValidity();
+        }
+        (this.passControl as PasswordComponent).isHideDummy = true;
+        break;
+      case('secrettext'):
+        field.setValue(null);
+        field.updateValueAndValidity();
+        (this.secretTextControl as SecretTextComponent).clear();
+        break;
+    }
+
+    this.options.value = field.value;
+    this.form.updateValueAndValidity();
   }
 }
