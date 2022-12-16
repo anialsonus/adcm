@@ -9,14 +9,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from django.urls import path
-
-from api.stats.root import StatsRoot
-from api.stats.views import JobStats, TaskStats
-
-urlpatterns = [
-    path("", StatsRoot.as_view(), {"pk": 0}, name="stats"),
-    path("task/<int:pk>/", TaskStats.as_view(), name="task-stats"),
-    path("job/<int:pk>/", JobStats.as_view(), name="job-stats"),
-]
+- name: Should be failed(role doesnt find)
+  hosts: all
+  become: true
+  gather_facts: no
+  roles:
+    - roles/failed
