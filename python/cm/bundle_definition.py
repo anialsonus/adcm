@@ -81,6 +81,9 @@ class BaseData(BaseModel):
     @classmethod
     def _dict_get(cls, source: dict, key: str) -> tuple[Any, bool]:
         """returns (<value>, <is_legit_value>)"""
+        if not source:  # TODO: нужно ли? написано для бандлов из юниттестов. проверить
+            return None, False
+
         if key in source:
             if source.get(key, None) is None:
                 if key in cls._none_allowed_fields:
@@ -94,6 +97,9 @@ class BaseData(BaseModel):
 
     @staticmethod
     def _get_display_name(source: dict, prototype: "PrototypeData"):
+        if not source:  # TODO: нужно ли? написано для бандлов из юниттестов. проверить
+            return ""
+
         if "display_name" in source:
             return source["display_name"]
 
@@ -289,9 +295,10 @@ class PrototypeData(BaseData):
         value, legit = cls._dict_get(source=component_source, key="monitoring")
         if legit:
             component.monitoring = value
-        value, legit = cls._dict_get(source=component_source, key="params")
-        if legit:
-            component.params = value  # pylint: disable=attribute-defined-outside-init  # TODO: wtf, pylint?!
+        # TODO: unused? (cm.stack.save_components)
+        # value, legit = cls._dict_get(source=component_source, key="params")
+        # if legit:
+        #     component.params = value
         value, legit = cls._dict_get(source=component_source, key="constraint")
         if legit:
             component.constraint = value
@@ -654,16 +661,31 @@ class BundleDefinition:
 
     @staticmethod
     def _make_objects(config: dict, definition_data: DefinitionData) -> None:
+        # pylint: disable=too-many-branches
+
+        # TODO: нужно ли? написано для бандлов из юниттестов. проверить
+        if not config:
+            return
+
         prototype = PrototypeData.make(source=config, definition_data=definition_data)
         definition_data.prototypes.append(prototype)
 
         for action_data, action_source in ActionData.make_bulk(source=config, prototype=prototype):
             definition_data.actions.append(action_data)
+
+            # TODO: нужно ли? написано для бандлов из юниттестов. проверить
+            if not action_source:
+                continue
+
             for sub_action in SubActionData.make_bulk(action_data=action_data, action_source=action_source):
                 definition_data.sub_actions.append(sub_action)
 
         for upgrade, upgrade_source in UpgradeData.make_bulk(prototype=prototype, source=config):
             definition_data.upgrades.append(upgrade)
+
+            # TODO: нужно ли? написано для бандлов из юниттестов. проверить
+            if not upgrade_source:
+                continue
 
             # TODO: проверить на апгейдах с ["scripts"], когда upgrade.action != None
             upgrade_action_data = None
@@ -677,6 +699,11 @@ class BundleDefinition:
 
             if upgrade_action_data is not None:
                 definition_data.actions.append(upgrade_action_data)
+
+                # TODO: нужно ли? написано для бандлов из юниттестов. проверить
+                if not upgrade_action_source:
+                    continue
+
                 for sub_action in SubActionData.make_bulk(
                     action_data=upgrade_action_data, action_source=upgrade_action_source
                 ):
@@ -686,9 +713,19 @@ class BundleDefinition:
             prototype=prototype, source=config, definition_data=definition_data
         ):
             definition_data.prototypes.append(component_data)
+
+            # TODO: нужно ли? написано для бандлов из юниттестов. проверить
+            if not component_source:
+                continue
+
             # TODO: проверить сохранение экшнов/сабэкшнов компонента
             for action_data, action_source in ActionData.make_bulk(source=component_source, prototype=component_data):
                 definition_data.actions.append(action_data)
+
+                # TODO: нужно ли? написано для бандлов из юниттестов. проверить
+                if not action_source:
+                    continue
+
                 for sub_action in SubActionData.make_bulk(action_data=action_data, action_source=action_source):
                     definition_data.sub_actions.append(sub_action)
 
