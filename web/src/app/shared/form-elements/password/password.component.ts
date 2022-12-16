@@ -172,11 +172,4 @@ export class PasswordComponent extends FieldDirective implements OnInit, AfterVi
     }
     return null;
   }
-
-  // change(value: string) {
-  //   if (value === null) {
-  //     this.hideDummy(false);
-  //     this.cd.detectChanges();
-  //   }
-  // }
 }
