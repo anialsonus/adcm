@@ -71,7 +71,7 @@ class TestHeader:
 
     def test_header_help_links_for_authorised_user(self, app_fs):
         """Test header help links for authorised user"""
-        params = {"help_link": "t.me/joinchat/", "docs_link": "docs.arenadata.io/adcm/"}
+        params = {"help_link": "t.me/arenadata_cm", "docs_link": "docs.arenadata.io/adcm/"}
         header = PageHeader(app_fs.driver, app_fs.adcm.url)
         header.click_help_button_in_header()
         header.check_help_popup()
