@@ -34,6 +34,7 @@ from cm.stack import (
     UNAVAILABLE,
     UNSET,
     _deep_get,
+    check_component_constraint,
     check_object_definition,
     check_upgrade,
     validate_name,
@@ -101,7 +102,8 @@ class BaseData(BaseModel):
 
 class PrototypeData(BaseData):
     type: str
-    parent: "PrototypeData" = None
+    # parent: "PrototypeData" = None
+    parent_ref: str = ""  # TODO: questionable
     name: str
     path: str = ""
     display_name: str = ""
@@ -161,11 +163,11 @@ class PrototypeData(BaseData):
             prototype.allow_maintenance_mode = value
 
         prototype.display_name = cls._get_display_name(source=source, prototype=prototype)
-        prototype.config_group_customization = cls.get_config_group_customization(
+        prototype.config_group_customization = cls._get_config_group_customization(
             source=source, prototype=prototype, definition_data=definition_data
         )
 
-        if license_hash := cls.get_license_hash(
+        if license_hash := cls._get_license_hash(
             source=source, prototype=prototype, definition_file=definition_data.definition_file
         ) != "absent" and prototype.type not in [
             "cluster",
@@ -185,7 +187,7 @@ class PrototypeData(BaseData):
         return prototype
 
     @staticmethod
-    def get_config_group_customization(
+    def _get_config_group_customization(
         source: dict, prototype: "PrototypeData", definition_data: DefinitionData
     ) -> bool:
         if not source:
@@ -204,7 +206,10 @@ class PrototypeData(BaseData):
                     cluster_prototype = cluster_prototype[0]
 
             elif prototype.type == "component":
-                cluster_prototype = prototype.parent
+                # TODO: exception handling for IndexError
+                cluster_prototype = [
+                    i for i in definition_data.prototypes + [prototype] if i.ref == prototype.parent_ref
+                ][0]
 
             if cluster_prototype:
                 return cluster_prototype.config_group_customization
@@ -212,7 +217,7 @@ class PrototypeData(BaseData):
         return False
 
     @staticmethod
-    def get_license_hash(source: dict, prototype: "PrototypeData", definition_file: DefinitionFile) -> str:
+    def _get_license_hash(source: dict, prototype: "PrototypeData", definition_file: DefinitionFile) -> str:
         if "license" not in source:
             return "absent"
 
@@ -240,6 +245,72 @@ class PrototypeData(BaseData):
                 return sha1.hexdigest()
 
         return "absent"
+
+    @classmethod
+    def make_components_bulk(
+        cls, prototype: "PrototypeData", source: dict, definition_data: DefinitionData
+    ) -> list[tuple["PrototypeData", dict]]:
+        components, _ = cls._dict_get(source=source, key="components")
+        if components is None:
+            return []
+
+        components_list = []
+        for component_name, component_source in components.items():
+            components_list.append(
+                cls._make_component(
+                    prototype=prototype,
+                    component_name=component_name,
+                    component_source=component_source,
+                    definition_data=definition_data,
+                )
+            )
+
+        return components_list
+
+    @classmethod
+    def _make_component(
+        cls, prototype: "PrototypeData", component_name: str, component_source: dict, definition_data: DefinitionData
+    ) -> tuple["PrototypeData", dict]:
+        validate_name(component_name, f"Component name \"{component_name}\" of {prototype.ref}")
+        check_component_constraint(proto=prototype, name=component_name, conf=component_source)
+
+        component = cls(
+            type="component",
+            parent_ref=prototype.ref,
+            path=prototype.path,
+            name=component_name,
+            version=prototype.version,
+            adcm_min_version=prototype.adcm_min_version,
+        )
+
+        value, legit = cls._dict_get(source=component_source, key="description")
+        if legit:
+            component.description = value
+        value, legit = cls._dict_get(source=component_source, key="monitoring")
+        if legit:
+            component.monitoring = value
+        value, legit = cls._dict_get(source=component_source, key="params")
+        if legit:
+            component.params = value  # pylint: disable=attribute-defined-outside-init  # TODO: wtf, pylint?!
+        value, legit = cls._dict_get(source=component_source, key="constraint")
+        if legit:
+            component.constraint = value
+        value, legit = cls._dict_get(source=component_source, key="requires")
+        if legit:
+            component.requires = value
+        value, legit = cls._dict_get(source=component_source, key="venv")
+        if legit:
+            component.venv = value
+        value, legit = cls._dict_get(source=component_source, key="bound_to")
+        if legit:
+            component.bound_to = value
+
+        component.display_name = cls._get_display_name(source=component_source, prototype=component)
+        prototype.config_group_customization = cls._get_config_group_customization(
+            source=component_source, prototype=component, definition_data=definition_data
+        )
+
+        return component, component_source
 
 
 class ActionData(BaseData):
@@ -611,8 +682,17 @@ class BundleDefinition:
                 ):
                     definition_data.sub_actions.append(sub_action)
 
+        for component_data, component_source in PrototypeData.make_components_bulk(
+            prototype=prototype, source=config, definition_data=definition_data
+        ):
+            definition_data.prototypes.append(component_data)
+            # TODO: проверить сохранение экшнов/сабэкшнов компонента
+            for action_data, action_source in ActionData.make_bulk(source=component_source, prototype=component_data):
+                definition_data.actions.append(action_data)
+                for sub_action in SubActionData.make_bulk(action_data=action_data, action_source=action_source):
+                    definition_data.sub_actions.append(sub_action)
+
         # TODO: save_prototype_config after each prototype, action, component
-        # TODO: save_components
         # TODO: save_export
         # TODO: save_import
 
@@ -622,7 +702,21 @@ class BundleDefinition:
     def validate(self):
         # TODO: remove dev code
         # from pprint import pformat
-        # logger.critical(f"DEBUG_BUNDLE_DEF\n{pformat(self._definitions)}")
+        # for definition in self._definitions:
+        #     logger.critical(f"definition.prototypes")
+        #     logger.critical(f"{pformat(definition.prototypes)}")
+        #     logger.critical(f"definition.actions")
+        #     logger.critical(f"{pformat(definition.actions)}")
+        #     logger.critical(f"definition.sub_actions")
+        #     logger.critical(f"{pformat(definition.sub_actions)}")
+        #     logger.critical(f"definition.prototype_configs")
+        #     logger.critical(f"{pformat(definition.prototype_configs)}")
+        #     logger.critical(f"definition.upgrades")
+        #     logger.critical(f"{pformat(definition.upgrades)}")
+        #     logger.critical(f"definition.prototype_exports")
+        #     logger.critical(f"{pformat(definition.prototype_exports)}")
+        #     logger.critical(f"definition.prototype_imports")
+        #     logger.critical(f"{pformat(definition.prototype_imports)}")
         self._validate()
 
     def _validate_actions(self):
