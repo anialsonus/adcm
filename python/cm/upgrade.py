@@ -322,7 +322,7 @@ def revert_object(obj, old_proto):
         return
 
     obj.prototype = old_proto
-    if obj.before_upgrade.get("config"):
+    if "config" in obj.before_upgrade:
         cl = ConfigLog.objects.get(id=obj.before_upgrade["config"])
         obj.config.current = 0
         save_obj_config(obj.config, cl.config, cl.attr, "revert_upgrade")
