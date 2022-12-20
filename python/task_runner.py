@@ -73,14 +73,13 @@ def run_job(task_id, job_id, err_file):
         str(job_id),
     ]
     logger.info("task run job cmd: %s", " ".join(cmd))
+
     try:
         proc = subprocess.Popen(cmd, stderr=err_file)
         res = proc.wait()
-
         return res
     except Exception:  # pylint: disable=broad-except
         logger.error("exception running job %s", job_id)
-
         return 1
 
 
@@ -121,10 +120,11 @@ def run_task(task_id, args=None):
     count = 0
     res = 0
     for job in jobs:
+        job.refresh_from_db()
         if args == "restart" and job.status == JobStatus.SUCCESS:
             logger.info('skip job #%s status "%s" of task #%s', job.id, job.status, task_id)
-
             continue
+
         task.refresh_from_db()
         re_prepare_job(task, job)
         job.start_date = timezone.now()
@@ -140,11 +140,18 @@ def run_task(task_id, args=None):
                 task.object_id = 0
                 task.object_type = None
 
+        job.refresh_from_db()
         count += 1
         if res != 0:
-            break
+            if job.status != JobStatus.ABORTED:
+                break
 
-    if res == 0:
+    if job is not None:
+        job.refresh_from_db()
+
+    if job is not None and job.status == JobStatus.ABORTED:
+        finish_task(task, job, JobStatus.ABORTED)
+    elif res == 0:
         finish_task(task, job, JobStatus.SUCCESS)
     else:
         finish_task(task, job, JobStatus.FAILED)

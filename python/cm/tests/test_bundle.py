@@ -9,6 +9,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import json
 import os
 from contextlib import contextmanager
@@ -24,10 +25,16 @@ from rest_framework.status import HTTP_201_CREATED
 
 from adcm.tests.base import BaseTestCase
 from cm.adcm_config import ansible_decrypt
-from cm.models import Bundle, Cluster, ConfigLog, Prototype
-
-# Since this module is beyond QA responsibility we will not fix docstrings here
-# pylint: disable=missing-function-docstring, missing-class-docstring
+from cm.api import delete_host_provider
+from cm.bundle import delete_bundle
+from cm.errors import AdcmEx
+from cm.models import Bundle, ConfigLog
+from cm.tests.test_upgrade import (
+    cook_cluster,
+    cook_cluster_bundle,
+    cook_provider,
+    cook_provider_bundle,
+)
 
 
 class TestBundle(BaseTestCase):
@@ -111,7 +118,7 @@ class TestBundle(BaseTestCase):
         finally:
             os.remove(bundle_filepath)
 
-    def load_bundle(self, bundle_name: str) -> int:
+    def _load_bundle(self, bundle_name: str) -> int:
         with open(Path(self.files_dir, bundle_name), encoding=settings.ENCODING_UTF_8) as f:
             with transaction.atomic():
                 response = self.client.post(
@@ -126,23 +133,6 @@ class TestBundle(BaseTestCase):
             )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         return response.json()["id"]
-
-    def upload_bundle_create_cluster_config_log(self) -> tuple[Bundle, Cluster, ConfigLog]:
-        bundle = self.upload_and_load_bundle(
-            path=Path(
-                settings.BASE_DIR,
-                "python/cm/tests/files/config_cluster_secretfile_secretmap.tar",
-            ),
-        )
-
-        cluster_prototype = Prototype.objects.get(bundle_id=bundle.pk, type="cluster")
-        cluster_response: Response = self.client.post(
-            path=reverse("cluster"),
-            data={"name": "test-cluster", "prototype_id": cluster_prototype.pk},
-        )
-        cluster = Cluster.objects.get(pk=cluster_response.data["id"])
-
-        return bundle, cluster, ConfigLog.objects.get(obj_ref=cluster.config)
 
     def test_upload_duplicated_upgrade_script_names(self):
         same_upgrade_name = "Upgrade name"
@@ -176,7 +166,7 @@ class TestBundle(BaseTestCase):
             filename="test_bundle.tar.gz",
         ) as bundle:
             try:
-                bundle_id = self.load_bundle(bundle)
+                bundle_id = self._load_bundle(bundle)
                 Bundle.objects.get(pk=bundle_id).delete()
             except transaction.TransactionManagementError:  # == IntegrityError
                 pass
@@ -197,11 +187,16 @@ class TestBundle(BaseTestCase):
                 bundle_content=self.bundle_config_template.format(**{**kwargs, **value}),
                 filename="test_bundle.tar.gz",
             ) as bundle:
-                bundle_id = self.load_bundle(bundle)
+                bundle_id = self._load_bundle(bundle)
                 Bundle.objects.get(pk=bundle_id).delete()
 
     def test_secretfile(self):
-        bundle, cluster, config_log = self.upload_bundle_create_cluster_config_log()
+        bundle, cluster, config_log = self.upload_bundle_create_cluster_config_log(
+            bundle_path=Path(
+                settings.BASE_DIR,
+                "python/cm/tests/files/config_cluster_secretfile_secretmap.tar",
+            ),
+        )
 
         with open(Path(settings.BUNDLE_DIR, bundle.hash, "secretfile"), encoding=settings.ENCODING_UTF_8) as f:
             secret_file_bundle_content = f.read()
@@ -234,7 +229,12 @@ class TestBundle(BaseTestCase):
         self.assertEqual(new_content, ansible_decrypt(new_config_log.config["secretfile"]))
 
     def test_secretmap(self):
-        _, cluster, config_log = self.upload_bundle_create_cluster_config_log()
+        _, cluster, config_log = self.upload_bundle_create_cluster_config_log(
+            bundle_path=Path(
+                settings.BASE_DIR,
+                "python/cm/tests/files/config_cluster_secretfile_secretmap.tar",
+            ),
+        )
 
         self.assertIn(settings.ANSIBLE_VAULT_HEADER, config_log.config["secretmap"]["key"])
         self.assertEqual("value", ansible_decrypt(config_log.config["secretmap"]["key"]))
@@ -253,3 +253,40 @@ class TestBundle(BaseTestCase):
 
         self.assertIn(settings.ANSIBLE_VAULT_HEADER, new_config_log.config["secretmap"]["key"])
         self.assertEqual(new_value, ansible_decrypt(new_config_log.config["secretmap"]["key"]))
+
+    def test_secretmap_no_default(self):
+        self.upload_bundle_create_cluster_config_log(
+            bundle_path=Path(
+                settings.BASE_DIR,
+                "python/cm/tests/files/test_secret_config_v10_community.tar",
+            ),
+        )
+
+    def test_secretmap_no_default1(self):
+        self.upload_bundle_create_cluster_config_log(
+            bundle_path=Path(
+                settings.BASE_DIR,
+                "python/cm/tests/files/test_secret_config_v12_community.tar",
+            ),
+        )
+
+    def test_cluster_bundle_deletion(self):
+        bundle = cook_cluster_bundle("1.0")
+        cook_cluster(bundle, "TestCluster")
+        try:
+            delete_bundle(bundle)
+        except AdcmEx as e:
+            self.assertEqual(e.code, "BUNDLE_CONFLICT")
+
+    def test_provider_bundle_deletion(self):
+        bundle = cook_provider_bundle("1.0")
+        provider = cook_provider(bundle, "TestProvider")
+        try:
+            delete_bundle(bundle)
+        except AdcmEx as e:
+            self.assertEqual(e.code, "BUNDLE_CONFLICT")
+
+        try:
+            delete_host_provider(provider)
+        except AdcmEx as e:
+            self.assertEqual(e.code, "PROVIDER_CONFLICT")
