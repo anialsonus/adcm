@@ -137,6 +137,7 @@ export class FieldComponent extends BaseDirective implements OnInit, OnChanges {
           confirm.updateValueAndValidity();
         }
         (this.passControl as PasswordComponent).isHideDummy = true;
+        this.passControl['dummy'] = '';
         break;
       case('secrettext'):
         field.setValue(null);

@@ -46,8 +46,8 @@
         <mat-icon>refresh</mat-icon>
       </button>
       <button *ngIf="isSecretField()" (click)="reset()" [disabled]="options.read_only || disabled" mat-icon-button matSuffix
-                    color="primary"
-                    matTooltip="Remove value">
+              color="primary"
+              matTooltip="Remove value">
         <mat-icon>close</mat-icon>
       </button>
     </span>
