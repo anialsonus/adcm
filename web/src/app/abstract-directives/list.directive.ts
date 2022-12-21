@@ -77,7 +77,8 @@ export abstract class ListDirective extends BaseDirective implements OnInit, OnD
         if (urlHasSubdomain && path) {
           this.router.navigate(['./admin', path, urlParams]);
         } else {
-          localStorage.removeItem('list:param');
+          const { page } = urlParams;
+          this.updateLocalStorage('page', page);
           history.back();
         }
       }
@@ -149,18 +150,7 @@ export abstract class ListDirective extends BaseDirective implements OnInit, OnD
     const pageIndex = this.getPageIndex();
     const pageSize = this.getPageSize();
     const ordering = this.getSortParam(sort);
-    const ls = localStorage.getItem('list:param');
-    let listParam = ls ? JSON.parse(ls) : null;
-
-    listParam = {
-      ...listParam,
-      [this.type]: {
-        ...listParam?.[this.type],
-        ordering
-      }
-    }
-
-    localStorage.setItem('list:param', JSON.stringify(listParam));
+    this.updateLocalStorage('ordering', ordering);
 
     this.router.navigate(
       [
@@ -233,5 +223,20 @@ export abstract class ListDirective extends BaseDirective implements OnInit, OnD
 
   gotoStatus(data: StatusData<ICluster>): void {
     this.clickCell(data.event, data.action, data.row);
+  }
+
+  updateLocalStorage(key: string, value: string) {
+    const ls = localStorage.getItem('list:param');
+    let listParam = ls ? JSON.parse(ls) : null;
+
+    listParam = {
+      ...listParam,
+      [this.type]: {
+        ...listParam?.[this.type],
+        [key]: value
+      }
+    }
+
+    localStorage.setItem('list:param', JSON.stringify(listParam));
   }
 }
