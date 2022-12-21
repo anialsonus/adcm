@@ -9,15 +9,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+---
+- name: sleep
+  hosts: all
+  connection: local
+  gather_facts: no
 
-"""Footer locators"""
-
-from selenium.webdriver.common.by import By
-from tests.ui_tests.app.helpers.locator import Locator
-
-
-class CommonFooterLocators:
-    """ADCM footer locators"""
-
-    version_link = Locator(By.CSS_SELECTOR, "footer a[href*='docs']", "Link to version doc page")
-    logo = Locator(By.XPATH, "//footer//*[contains(text(), 'ARENADATA ©')]", "Footer logo")
+  tasks:
+    - name: "Fail"
+      pause:
+        seconds: 2
+      assert:
+        that:
+          - 1 != 1
+        msg: "Never gonna give you up"
+      tags:
+        - fail

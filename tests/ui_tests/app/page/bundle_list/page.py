@@ -17,13 +17,10 @@ from dataclasses import dataclass
 import allure
 from selenium.webdriver.remote.webelement import WebElement
 from tests.ui_tests.app.page.bundle_list.locators import BundleListLocators
-from tests.ui_tests.app.page.common.base_page import (
-    BasePageObject,
-    PageFooter,
-    PageHeader,
-)
-from tests.ui_tests.app.page.common.dialogs.locators import DeleteDialog
+from tests.ui_tests.app.page.common.base_page import BasePageObject
+from tests.ui_tests.app.page.common.dialogs.locators import DeleteDialogLocators
 from tests.ui_tests.app.page.common.table.page import CommonTableObj
+from tests.ui_tests.core.checks import check_element_is_visible
 
 
 @dataclass
@@ -41,9 +38,7 @@ class BundleListPage(BasePageObject):
 
     def __init__(self, driver, base_url):
         super().__init__(driver, base_url, "/bundle")
-        self.header = PageHeader(self.driver, self.base_url)
-        self.footer = PageFooter(self.driver, self.base_url)
-        self.table = CommonTableObj(self.driver, self.base_url, BundleListLocators.Table)
+        self.table = CommonTableObj(driver=self.driver, locators_class=BundleListLocators.Table)
 
     @allure.step('Get bundle information from row #{row_num}')
     def get_bundle_info(self, row_num: int = 0) -> BundleInfo:
@@ -72,9 +67,9 @@ class BundleListPage(BasePageObject):
         """Remove bundle by clicking on trash icon in row"""
         row = self.table.get_row(row_num)
         self.find_child(row, BundleListLocators.Table.Row.delete_btn).click()
-        self.wait_element_visible(DeleteDialog.body)
-        self.find_and_click(DeleteDialog.yes)
-        self.wait_element_hide(DeleteDialog.body)
+        self.wait_element_visible(DeleteDialogLocators.body)
+        self.find_and_click(DeleteDialogLocators.yes)
+        self.wait_element_hide(DeleteDialogLocators.body)
 
     @allure.step('Accept licence agreement')
     def accept_licence(self, row_num: int = 0):
@@ -99,5 +94,4 @@ class BundleListPage(BasePageObject):
 
     @allure.step('Check bundle is visible')
     def check_at_least_one_bundle_is_presented(self):
-        """Check that at least one row is visible in table"""
-        self.check_element_should_be_visible(BundleListLocators.Table.row)
+        check_element_is_visible(self, BundleListLocators.Table.row)

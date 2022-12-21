@@ -10,4 +10,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""UI tests helpers"""
+from tests.ui_tests.generator_helper.configs_generator import *  # noqa

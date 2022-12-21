@@ -19,13 +19,11 @@ from typing import Optional
 import allure
 from adcm_pytest_plugin.utils import wait_until_step_succeeds
 from selenium.webdriver.remote.webelement import WebElement
-from tests.ui_tests.app.page.common.base_page import (
-    BasePageObject,
-    PageFooter,
-    PageHeader,
+from tests.ui_tests.app.page.common.base_page import BasePageObject
+from tests.ui_tests.app.page.common.dialogs.locators import (
+    ActionDialog,
+    DeleteDialogLocators,
 )
-from tests.ui_tests.app.page.common.dialogs.locators import ActionDialog, DeleteDialog
-from tests.ui_tests.app.page.common.popups.page import HostCreatePopupObj
 from tests.ui_tests.app.page.common.table.page import CommonTableObj
 from tests.ui_tests.app.page.common.tooltip_links.page import CommonToolbar
 from tests.ui_tests.app.page.host_list.locators import HostListLocators
@@ -46,11 +44,8 @@ class ProviderListPage(BasePageObject):
 
     def __init__(self, driver, base_url):
         super().__init__(driver, base_url, "/provider")
-        self.header = PageHeader(self.driver, self.base_url)
-        self.footer = PageFooter(self.driver, self.base_url)
         self.toolbar = CommonToolbar(self.driver, self.base_url)
-        self.table = CommonTableObj(self.driver, self.base_url, HostListLocators.HostTable)
-        self.host_popup = HostCreatePopupObj(self.driver, self.base_url)
+        self.table = CommonTableObj(driver=self.driver, locators_class=HostListLocators.HostTable)
 
     @allure.step("Create provider")
     def create_provider(self, bundle: str, name: Optional[str] = None, description: Optional[str] = None):
@@ -116,6 +111,6 @@ class ProviderListPage(BasePageObject):
     def delete_provider_in_row(self, row: WebElement):
         """Delete host by button from row"""
         self.find_child(row, ProviderListLocators.ProviderTable.ProviderRow.delete_btn).click()
-        self.wait_element_visible(DeleteDialog.body)
-        self.find_and_click(DeleteDialog.yes)
-        self.wait_element_hide(DeleteDialog.body)
+        self.wait_element_visible(DeleteDialogLocators.body)
+        self.find_and_click(DeleteDialogLocators.yes)
+        self.wait_element_hide(DeleteDialogLocators.body)
