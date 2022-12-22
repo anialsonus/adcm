@@ -39,6 +39,7 @@ from tests.library.utils import get_or_raise
 TIMEOUT_SUCCEED = 5
 PERIOD_SUCCEED = 0.5
 OBJECT_STATE_CREATED = "created"
+SET_MULTI_SET_ACTION = "set_multistate"
 
 
 class JobStep:
@@ -50,6 +51,12 @@ class Status:
     ABORTED = "aborted"
     SUCCESS = "success"
     FAILED = "failed"
+
+
+class MultiState:
+    UNSET = "unset_this"
+    FAILED = "multi_fail_on_last"
+    SUCCESS = "multi_ok"
 
 
 @pytest.fixture()
@@ -67,15 +74,6 @@ def cluster_multi_state(sdk_client_fs) -> Cluster:
     bundle = sdk_client_fs.upload_from_fs(get_data_dir(__file__, "cluster_multi_state"))
     cluster = bundle.cluster_create("multi_fail_on_last")
     cluster.service_add(name="first_srv")
-    return cluster
-
-
-@pytest.fixture()
-def cluster_delete(sdk_client_fs) -> Cluster:
-    """Create cluster with multi state tasks and add service"""
-    bundle = sdk_client_fs.upload_from_fs(get_data_dir(__file__, "cluster_delete"))
-    cluster = bundle.cluster_create("sample_cluster")
-    cluster.service_add(name="service_1")
     return cluster
 
 
@@ -296,11 +294,11 @@ class TestTaskCancelRestart:
         """
         with allure.step("Run multi state action"):
             cluster = cluster_multi_state
-            run_cluster_action_and_assert_result(cluster, "set_multistate")
+            run_cluster_action_and_assert_result(cluster, SET_MULTI_SET_ACTION)
 
         with allure.step("Run failed action on cluster and abort last task"):
             expected_object_state = cluster.state
-            expected_object_multi_state = "unset_this"
+            expected_object_multi_state = MultiState.UNSET
             action = cluster.action(name=action_name)
             task = action.run()
             self.wait_job_and_abort(task=task, job_wait=JobStep.SECOND, job_abort=JobStep.SECOND)
@@ -337,11 +335,11 @@ class TestTaskCancelRestart:
         """
         with allure.step("Run multi state action"):
             cluster = cluster_multi_state
-            run_cluster_action_and_assert_result(cluster, "set_multistate")
+            run_cluster_action_and_assert_result(cluster, SET_MULTI_SET_ACTION)
 
         with allure.step("Run failed action on cluster and abort first task"):
             expected_object_state = "not_multi_state"
-            expected_object_multi_state = "multi_fail_on_last"
+            expected_object_multi_state = MultiState.FAILED
             action = cluster.action(name=action_name)
             task = action.run()
             self.wait_job_and_abort(task=task, job_wait=JobStep.FIRST, job_abort=JobStep.FIRST)
@@ -378,10 +376,10 @@ class TestTaskCancelRestart:
         """
         with allure.step("Run multi state action"):
             cluster = cluster_multi_state
-            run_cluster_action_and_assert_result(cluster, "set_multistate")
+            run_cluster_action_and_assert_result(cluster, SET_MULTI_SET_ACTION)
 
         with allure.step("Run failed action on cluster and abort first task"):
-            expected_object_state = "multi_ok"
+            expected_object_state = MultiState.SUCCESS
             action = cluster.action(name=action_name)
             task = action.run()
             self.wait_job_and_abort(task=task, job_wait=JobStep.FIRST, job_abort=JobStep.FIRST)
