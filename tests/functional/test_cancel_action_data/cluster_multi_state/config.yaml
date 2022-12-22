@@ -27,7 +27,7 @@
           script: fail.yaml
           name: "second_step"
           on_fail:
-            state: multi_fail_on_last
+            state: not_multi_state
             multi_state:
               set:
                 - "multi_fail_on_last"
@@ -56,6 +56,7 @@
           unset:
             - "unset_this"
       on_success:
+        state: multi_ok
         multi_state:
           set:
             - "multi_ok"

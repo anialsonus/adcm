@@ -83,7 +83,18 @@ def wait_for_job_status(
 @allure.step("Check object state")
 def check_object_status(adcm_object: Cluster | Service | Component, expected_state: str) -> None:
     adcm_object.reread()
-    assert adcm_object.state == expected_state, f"Expected object state {expected_state} Actual {adcm_object.state}"
+    actual = adcm_object.state
+    assert actual == expected_state, f"Expected object state {expected_state} Actual {actual}"
+
+
+@allure.step("Check object multi state")
+def check_object_multi_state(adcm_object: Cluster | Service | Component, expected_state: str) -> None:
+    adcm_object.reread()
+    assert (
+        len(adcm_object.multi_state) > 0
+    ), f"Expected object does not have multi state while expected state: {expected_state}"
+    actual = adcm_object.multi_state[0]
+    assert actual == expected_state, f"Expected object state {expected_state} Actual {actual}"
 
 
 @allure.step("Check task status")

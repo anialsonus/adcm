@@ -19,13 +19,18 @@ import requests
 from adcm_client.objects import ADCMClient, Cluster, Job, Task
 from adcm_pytest_plugin.steps.actions import run_cluster_action_and_assert_result
 from adcm_pytest_plugin.utils import get_data_dir
-
 from tests.functional.audit.conftest import (
     check_failed,
     check_succeed,
     make_auth_header,
 )
-from tests.functional.tools import wait_for_job_status, check_task_status, check_object_status, check_jobs_status
+from tests.functional.tools import (
+    check_jobs_status,
+    check_object_multi_state,
+    check_object_status,
+    check_task_status,
+    wait_for_job_status,
+)
 from tests.library.predicates import display_name_is
 from tests.library.utils import get_or_raise
 
@@ -62,6 +67,15 @@ def cluster_multi_state(sdk_client_fs) -> Cluster:
     bundle = sdk_client_fs.upload_from_fs(get_data_dir(__file__, "cluster_multi_state"))
     cluster = bundle.cluster_create("multi_fail_on_last")
     cluster.service_add(name="first_srv")
+    return cluster
+
+
+@pytest.fixture()
+def cluster_delete(sdk_client_fs) -> Cluster:
+    """Create cluster with multi state tasks and add service"""
+    bundle = sdk_client_fs.upload_from_fs(get_data_dir(__file__, "cluster_delete"))
+    cluster = bundle.cluster_create("sample_cluster")
+    cluster.service_add(name="service_1")
     return cluster
 
 
@@ -208,6 +222,14 @@ class TestTaskCancelRestart:
         """
         Test to check that task with canceled failed job has success status
         """
+        with allure.step("Check that config 'allow_to_terminate' does not change task behaviour"):
+            action = cluster.action(name=action_name)
+            expected_state = action.state_on_fail
+            task = action.run()
+            check_task_status(client=self.client, task=task, expected_status=Status.FAILED)
+            check_object_status(adcm_object=cluster, expected_state=expected_state)
+            check_jobs_status(task, expected_job_status=[Status.FAILED, OBJECT_STATE_CREATED])
+
         with allure.step("Check that task with aborted failed job has success result"):
             action = cluster.action(name=action_name)
             expected_state = action.state_on_success
@@ -278,11 +300,13 @@ class TestTaskCancelRestart:
 
         with allure.step("Run failed action on cluster and abort last task"):
             expected_object_state = cluster.state
+            expected_object_multi_state = "unset_this"
             action = cluster.action(name=action_name)
             task = action.run()
             self.wait_job_and_abort(task=task, job_wait=JobStep.SECOND, job_abort=JobStep.SECOND)
             check_task_status(client=self.client, task=task, expected_status=Status.ABORTED)
             check_object_status(adcm_object=cluster, expected_state=expected_object_state)
+            check_object_multi_state(adcm_object=cluster, expected_state=expected_object_multi_state)
             check_jobs_status(task, expected_job_status=[Status.SUCCESS, Status.ABORTED])
 
         with allure.step("Run failed action on service and abort last task"):
@@ -292,6 +316,7 @@ class TestTaskCancelRestart:
             self.wait_job_and_abort(task=task, job_wait=JobStep.SECOND, job_abort=JobStep.SECOND)
             check_task_status(client=self.client, task=task, expected_status=Status.ABORTED)
             check_object_status(adcm_object=cluster, expected_state=expected_object_state)
+            check_object_multi_state(adcm_object=cluster, expected_state=expected_object_multi_state)
             check_jobs_status(task, expected_job_status=[Status.SUCCESS, Status.ABORTED])
 
         with allure.step("Run failed action on component and abort last task"):
@@ -301,24 +326,28 @@ class TestTaskCancelRestart:
             self.wait_job_and_abort(task=task, job_wait=JobStep.SECOND, job_abort=JobStep.SECOND)
             check_task_status(client=self.client, task=task, expected_status=Status.ABORTED)
             check_object_status(adcm_object=cluster, expected_state=expected_object_state)
+            check_object_multi_state(adcm_object=cluster, expected_state=expected_object_multi_state)
             check_jobs_status(task, expected_job_status=[Status.SUCCESS, Status.ABORTED])
 
     @pytest.mark.parametrize("action_name", ["state_changing_fail"])
     def test_fail_multi_state(self, cluster_multi_state, action_name):
         """
         Test to check that failed task status is not changing when not last job is canceled
+        object state and multi state must be different
         """
         with allure.step("Run multi state action"):
             cluster = cluster_multi_state
             run_cluster_action_and_assert_result(cluster, "set_multistate")
 
         with allure.step("Run failed action on cluster and abort first task"):
-            expected_object_state = "multi_fail_on_last"
+            expected_object_state = "not_multi_state"
+            expected_object_multi_state = "multi_fail_on_last"
             action = cluster.action(name=action_name)
             task = action.run()
             self.wait_job_and_abort(task=task, job_wait=JobStep.FIRST, job_abort=JobStep.FIRST)
             check_task_status(client=self.client, task=task, expected_status=Status.FAILED)
             check_object_status(adcm_object=cluster, expected_state=expected_object_state)
+            check_object_multi_state(adcm_object=cluster, expected_state=expected_object_multi_state)
             check_jobs_status(task, expected_job_status=[Status.ABORTED, Status.FAILED])
 
         with allure.step("Run failed action on service and abort first task"):
@@ -328,6 +357,7 @@ class TestTaskCancelRestart:
             self.wait_job_and_abort(task=task, job_wait=JobStep.FIRST, job_abort=JobStep.FIRST)
             check_task_status(client=self.client, task=task, expected_status=Status.FAILED)
             check_object_status(adcm_object=cluster, expected_state=expected_object_state)
+            check_object_multi_state(adcm_object=cluster, expected_state=expected_object_multi_state)
             check_jobs_status(task, expected_job_status=[Status.ABORTED, Status.FAILED])
 
         with allure.step("Run failed action on component and abort first task"):
@@ -337,24 +367,27 @@ class TestTaskCancelRestart:
             self.wait_job_and_abort(task=task, job_wait=JobStep.FIRST, job_abort=JobStep.FIRST)
             check_task_status(client=self.client, task=task, expected_status=Status.FAILED)
             check_object_status(adcm_object=cluster, expected_state=expected_object_state)
+            check_object_multi_state(adcm_object=cluster, expected_state=expected_object_multi_state)
             check_jobs_status(task, expected_job_status=[Status.ABORTED, Status.FAILED])
 
     @pytest.mark.parametrize("action_name", ["state_changing_success"])
     def test_success_multi_state(self, cluster_multi_state, action_name):
         """
         Test to check that failed task status is not changing when not last job is canceled
+        Multi state and state must be equal
         """
         with allure.step("Run multi state action"):
             cluster = cluster_multi_state
             run_cluster_action_and_assert_result(cluster, "set_multistate")
 
         with allure.step("Run failed action on cluster and abort first task"):
-            expected_object_state = cluster.state
+            expected_object_state = "multi_ok"
             action = cluster.action(name=action_name)
             task = action.run()
             self.wait_job_and_abort(task=task, job_wait=JobStep.FIRST, job_abort=JobStep.FIRST)
             check_task_status(client=self.client, task=task, expected_status=Status.SUCCESS)
             check_object_status(adcm_object=cluster, expected_state=expected_object_state)
+            check_object_multi_state(adcm_object=cluster, expected_state=expected_object_state)
             check_jobs_status(task, expected_job_status=[Status.ABORTED, Status.SUCCESS])
 
         with allure.step("Run failed action on service and abort first task"):
@@ -364,6 +397,7 @@ class TestTaskCancelRestart:
             self.wait_job_and_abort(task=task, job_wait=JobStep.FIRST, job_abort=JobStep.FIRST)
             check_task_status(client=self.client, task=task, expected_status=Status.SUCCESS)
             check_object_status(adcm_object=cluster, expected_state=expected_object_state)
+            check_object_multi_state(adcm_object=cluster, expected_state=expected_object_state)
             check_jobs_status(task, expected_job_status=[Status.ABORTED, Status.SUCCESS])
 
         with allure.step("Run failed action on component and abort first task"):
@@ -373,6 +407,7 @@ class TestTaskCancelRestart:
             self.wait_job_and_abort(task=task, job_wait=JobStep.FIRST, job_abort=JobStep.FIRST)
             check_task_status(client=self.client, task=task, expected_status=Status.SUCCESS)
             check_object_status(adcm_object=cluster, expected_state=expected_object_state)
+            check_object_multi_state(adcm_object=cluster, expected_state=expected_object_state)
             check_jobs_status(task, expected_job_status=[Status.ABORTED, Status.SUCCESS])
 
     def _cancel_job(self, job: Job):
