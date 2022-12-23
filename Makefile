@@ -14,24 +14,29 @@ describe:
 	cp config.json web/src/assets/config.json
 
 buildss:
-	@docker run -i --rm -v $(CURDIR)/go:/code -w /code golang sh -c "make"
+	podman run -i --rm -v $(CURDIR)/go:/code -w /code docker.io/golang sh -c "make"
 
 buildjs:
-	@docker run -i --rm -v $(CURDIR)/wwwroot:/wwwroot -v $(CURDIR)/web:/code -w /code  node:16-alpine ./build.sh
+	podman run -i --rm -v $(CURDIR)/wwwroot:/wwwroot -v $(CURDIR)/web:/code -w /code  docker.io/node:16-alpine ./build.sh
 
 build_base:
-	@docker build . -t $(APP_IMAGE):$(APP_TAG)
+	podman build . -t $(APP_IMAGE):$(APP_TAG)
 
 build: describe buildss buildjs build_base
 
-unittests: buildss buildjs
-	DATA_DIR=$(CURDIR)/data DB_DIR=/var/adcm_db POSTGRES_ADCM_PASS="test_pass" POSTGRES_PASSWORD="test_pass" \
-	docker compose run --rm -e DJANGO_SETTINGS_MODULE=adcm.settings \
-	adcm sh -c "pip install --no-cache -r /adcm/requirements.txt && /adcm/python/manage.py test /adcm/python -v 2"
+unittests: buildss buildjs build_base
+	mkdir -p /tmp/adcm_db
+	podman run -d -p 5432:5432 -v ./init-user-db.sh:/docker-entrypoint-initdb.d/init-user-db.sh \
+	-v /tmp/adcm_db:/var/lib/postgresql/data -e POSTGRES_PASSWORD="test_password" \
+	-e POSTGRES_ADCM_PASS="test_password" --name db docker.io/postgres
+	podman run --rm -e DJANGO_SETTINGS_MODULE=adcm.settings -v ./data:/adcm/data \
+	$(APP_IMAGE):$(APP_TAG) sh -c "pip install --no-cache -r /adcm/requirements.txt && /adcm/python/manage.py test /adcm/python -v 2"
+	podman stop db
+	podman rm db
 
 pytest:
-	docker pull hub.adsw.io/library/functest:3.10.6.slim.buster-x64
-	docker run -i --rm --shm-size=4g -v /var/run/docker.sock:/var/run/docker.sock --network=host \
+	podman pull hub.adsw.io/library/functest:3.10.6.slim.buster-x64
+	podman run -i --rm --shm-size=4g -v /var/run/docker.sock:/var/run/docker.sock --network=host \
 	-v $(CURDIR)/:/adcm -w /adcm/ \
 	-e BUILD_TAG=${BUILD_TAG} -e ADCMPATH=/adcm/ -e PYTHONPATH=${PYTHONPATH}:python/ \
 	-e SELENOID_HOST="${SELENOID_HOST}" -e SELENOID_PORT="${SELENOID_PORT}" -e ALLURE_TESTPLAN_PATH="${ALLURE_TESTPLAN_PATH}" \
@@ -40,8 +45,8 @@ pytest:
 	--adcm-image="hub.adsw.io/adcm/adcm:$(subst /,_,$(BRANCH_NAME))" \
 
 pytest_release:
-	docker pull hub.adsw.io/library/functest:3.10.6.slim.buster.firefox-x64
-	docker run -i --rm --shm-size=4g -v /var/run/docker.sock:/var/run/docker.sock --network=host \
+	podman pull hub.adsw.io/library/functest:3.10.6.slim.buster.firefox-x64
+	podman run -i --rm --shm-size=4g -v /var/run/docker.sock:/var/run/docker.sock --network=host \
 	-v $(CURDIR)/:/adcm -v ${LDAP_CONF_FILE}:${LDAP_CONF_FILE} -w /adcm/ \
 	-e BUILD_TAG=${BUILD_TAG} -e ADCMPATH=/adcm/ -e PYTHONPATH=${PYTHONPATH}:python/ \
 	-e SELENOID_HOST="${SELENOID_HOST}" -e SELENOID_PORT="${SELENOID_PORT}" -e ALLURE_TESTPLAN_PATH="${ALLURE_TESTPLAN_PATH}" \
@@ -51,11 +56,11 @@ pytest_release:
 
 
 ng_tests:
-	docker pull hub.adsw.io/library/functest:3.8.6.slim.buster_node16-x64
-	docker run -i --rm -v $(CURDIR)/:/adcm -w /adcm/web hub.adsw.io/library/functest:3.8.6.slim.buster_node16-x64 ./ng_test.sh
+	podman pull hub.adsw.io/library/functest:3.8.6.slim.buster_node16-x64
+	podman run -i --rm -v $(CURDIR)/:/adcm -w /adcm/web hub.adsw.io/library/functest:3.8.6.slim.buster_node16-x64 ./ng_test.sh
 
 npm_check:
-	docker run -i --rm -v $(CURDIR)/wwwroot:/wwwroot -v $(CURDIR)/web:/code -w /code  node:16-alpine ./npm_check.sh
+	podman run -i --rm -v $(CURDIR)/wwwroot:/wwwroot -v $(CURDIR)/web:/code -w /code  node:16-alpine ./npm_check.sh
 
 pretty:
 	black license_checker.py python tests
