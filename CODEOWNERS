@@ -9,7 +9,7 @@
 .gitignore @ass @k.shestakov
 .gitlab-ci.yaml @aas @k.shestakov
 .pre-commit-config.yaml @aas @k.shestakov
-CODEOWNERS @aas
+CODEOWNERS @aas @v.remizov
 config.json @aas @k.shestakov
 COPYRIGHT @aas @ke
 docker-compose.yml @aas @k.shestakov
