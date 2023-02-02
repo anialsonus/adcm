@@ -16,7 +16,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('audit', '0002_alter_auditobject_object_type'),
     ]
